@@ -1,0 +1,87 @@
+# =============================================
+# ST-MGM: Spatiotemporal Multimodal Glucose Monitor
+# Hyperparameters & Training Configuration
+# =============================================
+
+# --- Signal Specifications ---
+signal:
+  ecg:
+    sampling_rate: 250       # Hz
+    duration_sec: 300        # 5 minutes
+    num_samples: 75000       # 250 * 300
+    bandpass_low: 0.5        # Hz
+    bandpass_high: 40.0      # Hz
+  ppg:
+    sampling_rate: 64        # Hz
+    duration_sec: 300        # 5 minutes
+    num_samples: 19200       # 64 * 300
+    bandpass_low: 0.5        # Hz
+    bandpass_high: 8.0       # Hz
+  eda:
+    sampling_rate: 4         # Hz
+    duration_sec: 300        # 5 minutes
+    num_samples: 1200        # 4 * 300
+
+# --- DWT Feature Extraction ---
+dwt:
+  wavelet: "db4"
+  level: 7
+  num_stat_features: 10     # per sub-band
+  num_subbands: 8           # raw + 7 detail levels
+  num_modalities: 2         # ECG + PPG
+  total_raw_features: 160   # 10 * 8 * 2
+  selected_features: 18     # after feature selection
+
+# --- 1D-ResNet (Spatial Morphological) ---
+resnet1d:
+  num_layers: 5             # conv blocks
+  output_features: 40       # compressed embedding
+  dnn_hidden_1: 512
+  dnn_dropout_1: 0.3
+  dnn_hidden_2: 128
+  dnn_dropout_2: 0.2
+
+# --- EDA Encoder ---
+eda_encoder:
+  conv1_out_channels: 8
+  conv1_kernel_size: 12
+  conv1_stride: 6
+  conv2_out_channels: 16
+  conv2_kernel_size: 8
+  conv2_stride: 5
+  lstm_hidden_size: 32      # per direction (64 total bidirectional)
+  output_features: 64
+
+# --- Fusion & Multi-Task ---
+fusion:
+  fusion_input_dim: 122     # ~18 + 40 + 64
+  shared_hidden_1: 64
+  shared_dropout_1: 0.3
+  shared_hidden_2: 32
+  shared_dropout_2: 0.2
+
+# --- Training ---
+training:
+  batch_size: 32
+  lr: 0.001
+  weight_decay: 0.0001
+  epochs: 100
+  patience: 20
+  optimizer: "adamw"
+  scheduler: "cosine"
+  classification_loss: "bce"
+  regression_loss: "mse"
+  loss_alpha: 0.5           # weight for classification loss
+  loss_beta: 0.5            # weight for regression loss
+  seed: 42
+  num_workers: 4
+  n_folds: 5
+
+# --- Feature Selection ---
+feature_selection:
+  ufs_n_clusters: 10        # Unsupervised FS (variance/clustering)
+  l1_alpha: 0.01            # L1-based FS (Lasso)
+  rfe_n_features: 18        # Recursive Feature Elimination target
+
+# --- Hypoglycemia Threshold ---
+hypo_threshold: 70          # mg/dL
