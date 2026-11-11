@@ -1,5 +1,11 @@
-dataset
-__pycache__
-data
-results
-venv
+# Datasets and generated feature outputs
+dataset/
+data/
+
+# Python virtual environment and bytecode caches
+venv/
+__pycache__/
+*.py[cod]
+
+# Model weights in results (keep summary JSONs tracked)
+results/**/*.pt
