@@ -80,10 +80,10 @@ class EDAEncoder(nn.Module):
         x = x.transpose(1, 2)  # (batch, ~38, 16)
 
         # Bi-LSTM
-        lstm_out, (h_n, c_n) = self.lstm(x)  # lstm_out: (batch, ~38, 64)
+        lstm_out, (h_n, c_n) = self.lstm(x)  # h_n: (2, batch, 32)
 
-        # Use last timestep output (contains full sequence information)
-        x = lstm_out[:, -1, :]  # (batch, 64)
+        # Concatenate final forward (h_n[-2]) and backward (h_n[-1]) hidden states
+        x = torch.cat([h_n[-2], h_n[-1]], dim=1)  # (batch, 64)
 
         return x
 

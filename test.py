@@ -40,11 +40,22 @@ from libs.dataloader import STMGMDataset, stmgm_collate_fn
 # ============================================================
 
 def find_eer_threshold(targets, probs):
-    """Find threshold at Equal Error Rate (where FPR == FNR)."""
+    """Find probability threshold at Equal Error Rate (where FPR == FNR) with finite-value guard."""
+    targets = np.asarray(targets).reshape(-1)
+    probs = np.asarray(probs).reshape(-1)
+    if len(targets) == 0 or len(np.unique(targets)) < 2 or np.allclose(probs, probs[0]):
+        return 0.5
     fpr, tpr, thresholds = roc_curve(targets, probs)
-    fnr = 1 - tpr
-    eer_idx = np.nanargmin(np.abs(fpr - fnr))
-    return float(thresholds[eer_idx])
+    finite_mask = np.isfinite(thresholds)
+    if not np.any(finite_mask):
+        return 0.5
+    fpr = fpr[finite_mask]
+    tpr = tpr[finite_mask]
+    thresholds = thresholds[finite_mask]
+    fnr = 1.0 - tpr
+    eer_idx = int(np.nanargmin(np.abs(fpr - fnr)))
+    thr = float(thresholds[eer_idx])
+    return float(np.clip(thr, 1e-6, 1.0 - 1e-6))
 
 
 def compute_mard(y_true, y_pred):
@@ -58,8 +69,70 @@ def compute_mard(y_true, y_pred):
     return float(np.mean(np.abs(y_pred[mask] - y_true[mask]) / y_true[mask]) * 100)
 
 
-def evaluate_fold(model, dataloader, device):
-    """Evaluate a single fold and return all metrics."""
+def compute_parkes_error_grid(y_true, y_pred):
+    """
+    Compute Parkes Consensus Error Grid zone percentages for Type 1 Diabetes.
+
+    Args:
+        y_true: 1D array of reference glucose values (mg/dL)
+        y_pred: 1D array of predicted glucose values (mg/dL)
+
+    Returns:
+        dict with percentages in zones 'A', 'B', 'C', 'D', 'E', and combined 'AB'.
+    """
+    ref = np.asarray(y_true, dtype=np.float64).reshape(-1)
+    pred = np.asarray(y_pred, dtype=np.float64).reshape(-1)
+    n = len(ref)
+    if n == 0:
+        return {'A': 0.0, 'B': 0.0, 'C': 0.0, 'D': 0.0, 'E': 0.0, 'AB': 0.0}
+
+    counts = {'A': 0, 'B': 0, 'C': 0, 'D': 0, 'E': 0}
+
+    for r, p in zip(ref, pred):
+        if p >= r:
+            # Above diagonal: check upper boundaries from most severe (E) to A
+            if r <= 50.0 and p > np.interp(r, [0.0, 35.0, 50.0], [150.0, 155.0, 550.0]):
+                counts['E'] += 1
+            elif r <= 125.0 and p > np.interp(
+                r, [0.0, 25.0, 50.0, 80.0, 125.0], [100.0, 100.0, 125.0, 215.0, 550.0]
+            ):
+                counts['D'] += 1
+            elif r <= 260.0 and p > np.interp(
+                r, [0.0, 30.0, 50.0, 70.0, 260.0], [60.0, 60.0, 80.0, 110.0, 550.0]
+            ):
+                counts['C'] += 1
+            elif r <= 430.0 and p > np.interp(
+                r, [0.0, 30.0, 140.0, 280.0, 430.0], [50.0, 50.0, 170.0, 380.0, 550.0]
+            ):
+                counts['B'] += 1
+            else:
+                counts['A'] += 1
+        else:
+            # Below diagonal: check lower boundaries from most severe (D) to A
+            if r >= 250.0 and (
+                p <= 40.0 or p < np.interp(r, [250.0, 550.0], [40.0, 150.0])
+            ):
+                counts['D'] += 1
+            elif r >= 120.0 and (
+                p <= 30.0 or p < np.interp(r, [120.0, 260.0, 550.0], [30.0, 130.0, 250.0])
+            ):
+                counts['C'] += 1
+            elif r >= 50.0 and (
+                p <= 30.0 or p < np.interp(
+                    r, [50.0, 170.0, 385.0, 550.0], [30.0, 145.0, 300.0, 450.0]
+                )
+            ):
+                counts['B'] += 1
+            else:
+                counts['A'] += 1
+
+    pct = {k: float(v * 100.0 / n) for k, v in counts.items()}
+    pct['AB'] = float((counts['A'] + counts['B']) * 100.0 / n)
+    return pct
+
+
+def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, fixed_threshold=None):
+    """Evaluate a single fold and return all classification, regression, and Parkes metrics."""
     model.eval()
     all_cls_preds = []
     all_cls_labels = []
@@ -75,28 +148,36 @@ def evaluate_fold(model, dataloader, device):
             hypo_label = batch['hypo_label']
             glucose = batch['glucose']
 
-            cls_pred, reg_pred = model(f_temporal, ecg_beat, ppg_pulse, eda)
+            cls_logits, reg_pred = model(f_temporal, ecg_beat, ppg_pulse, eda)
+            cls_prob = torch.sigmoid(cls_logits)
 
-            all_cls_preds.extend(cls_pred.squeeze().cpu().numpy().tolist())
-            all_cls_labels.extend(hypo_label.numpy().tolist())
-            all_reg_preds.extend(reg_pred.squeeze().cpu().numpy().tolist())
-            all_reg_labels.extend(glucose.numpy().tolist())
+            # Denormalize glucose predictions back to mg/dL
+            reg_pred_mgdl = reg_pred * float(glucose_std) + float(glucose_mean)
 
-    cls_preds = np.array(all_cls_preds)
-    cls_labels = np.array(all_cls_labels)
-    reg_preds = np.array(all_reg_preds)
-    reg_labels = np.array(all_reg_labels)
+            all_cls_preds.extend(cls_prob.reshape(-1).cpu().numpy().tolist())
+            all_cls_labels.extend(hypo_label.reshape(-1).numpy().tolist())
+            all_reg_preds.extend(reg_pred_mgdl.reshape(-1).cpu().numpy().tolist())
+            all_reg_labels.extend(glucose.reshape(-1).numpy().tolist())
 
-    # Classification metrics
-    try:
-        threshold = find_eer_threshold(cls_labels, cls_preds)
-    except Exception:
-        threshold = 0.5
+    cls_preds = np.array(all_cls_preds, dtype=np.float64)
+    cls_labels = np.array(all_cls_labels, dtype=np.int64)
+    reg_preds = np.array(all_reg_preds, dtype=np.float64)
+    reg_labels = np.array(all_reg_labels, dtype=np.float64)
+
+    # Classification threshold: prefer leak-free threshold determined on training fold
+    val_eer_threshold = find_eer_threshold(cls_labels, cls_preds)
+    if fixed_threshold is not None and np.isfinite(fixed_threshold):
+        threshold = float(fixed_threshold)
+    else:
+        threshold = val_eer_threshold
 
     cls_binary = (cls_preds >= threshold).astype(int)
 
     try:
-        auc = roc_auc_score(cls_labels, cls_preds)
+        if len(np.unique(cls_labels)) > 1:
+            auc = float(roc_auc_score(cls_labels, cls_preds))
+        else:
+            auc = 0.5
     except Exception:
         auc = 0.5
 
@@ -106,10 +187,11 @@ def evaluate_fold(model, dataloader, device):
     prec = precision_score(cls_labels, cls_binary, zero_division=0)
     f1 = f1_score(cls_labels, cls_binary, zero_division=0)
 
-    # Regression metrics
+    # Regression metrics (in mg/dL)
     rmse = float(np.sqrt(mean_squared_error(reg_labels, reg_preds)))
     mae = float(mean_absolute_error(reg_labels, reg_preds))
     mard = compute_mard(reg_labels, reg_preds)
+    parkes = compute_parkes_error_grid(reg_labels, reg_preds)
 
     return {
         # Classification
@@ -119,11 +201,15 @@ def evaluate_fold(model, dataloader, device):
         'specificity': float(spec),
         'precision': float(prec),
         'f1': float(f1),
-        'eer_threshold': threshold,
+        'eer_threshold': float(threshold),
+        'val_eer_threshold': float(val_eer_threshold),
         # Regression
         'rmse': rmse,
         'mae': mae,
         'mard': mard,
+        'parkes_zone_a': parkes['A'],
+        'parkes_zone_b': parkes['B'],
+        'parkes_ab': parkes['AB'],
         # Raw predictions
         'cls_preds': cls_preds.tolist(),
         'cls_labels': cls_labels.tolist(),
@@ -145,6 +231,7 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
     segments_path = os.path.join(data_dir, subject, 'segments.pkl')
     temporal_path = os.path.join(data_dir, subject, 'temporal_features.pkl')
     model_dir = os.path.join(results_dir, subject)
+    summary_path = os.path.join(model_dir, 'training_summary.json')
 
     if not os.path.exists(meta_path):
         print(f"ERROR: Metadata not found for {subject}")
@@ -159,8 +246,19 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
     with open(temporal_path, 'rb') as f:
         temporal_data = pickle.load(f)
 
-    temporal_selected = temporal_data['selected']
-    temporal_dim = temporal_selected.shape[1]
+    training_summary = {}
+    if os.path.exists(summary_path):
+        with open(summary_path, 'r') as f:
+            training_summary = json.load(f)
+
+    temporal_raw = temporal_data.get('raw')
+    temporal_selected_fallback = temporal_data.get('selected')
+    selected_indices_fallback = temporal_data.get('selected_indices')
+    fold_selected_map = temporal_data.get(
+        'fold_selected_indices',
+        metadata.get('fold_selected_indices', {}),
+    )
+    hypo_threshold = float(metadata.get('hypo_threshold', 70))
     folds = metadata.get('folds', metadata)
 
     print(f"\n{'='*60}")
@@ -178,20 +276,71 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
 
         print(f"\n--- {fold_name} ---")
 
-        val_indices = fold_info.get('val', [])
-        val_segments = [segments[i] for i in val_indices]
-        val_temporal = temporal_selected[val_indices]
+        checkpoint = torch.load(model_path, map_location=device)
+        fold_summary = training_summary.get(fold_name, {})
 
-        val_dataset = STMGMDataset(val_segments, val_temporal, augment=False, verbose=False)
+        if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+            state_dict = checkpoint['model_state_dict']
+            fold_meta = checkpoint
+        else:
+            state_dict = checkpoint
+            fold_meta = fold_summary
+
+        # Resolve per-fold selected feature indices
+        sel_idx = fold_meta.get(
+            'selected_indices',
+            fold_info.get('selected_indices', fold_selected_map.get(fold_name, selected_indices_fallback)),
+        )
+        sel_idx = np.array(sel_idx, dtype=int)
+
+        val_indices = fold_info.get('val', [])
+        train_indices = fold_info.get('train', [])
+        val_segments = [segments[i] for i in val_indices]
+
+        if temporal_raw is not None:
+            val_temporal_raw = temporal_raw[val_indices][:, sel_idx]
+            train_temporal_raw = temporal_raw[train_indices][:, sel_idx]
+        else:
+            val_temporal_raw = temporal_selected_fallback[val_indices]
+            train_temporal_raw = temporal_selected_fallback[train_indices]
+
+        # Standardize val_temporal using training fold statistics
+        if 'temporal_mean' in fold_meta and 'temporal_std' in fold_meta:
+            feat_mean = np.array(fold_meta['temporal_mean'], dtype=np.float32)
+            feat_std = np.array(fold_meta['temporal_std'], dtype=np.float32)
+        else:
+            feat_mean = np.mean(train_temporal_raw, axis=0).astype(np.float32)
+            feat_std = np.std(train_temporal_raw, axis=0).astype(np.float32)
+        feat_std = np.where(feat_std < 1e-8, 1.0, feat_std).astype(np.float32)
+
+        val_temporal = np.nan_to_num(
+            (val_temporal_raw - feat_mean) / feat_std, nan=0.0, posinf=0.0, neginf=0.0
+        ).astype(np.float32)
+
+        glucose_mean = float(fold_meta.get('glucose_mean', 0.0))
+        glucose_std = float(fold_meta.get('glucose_std', 1.0))
+        fixed_threshold = fold_meta.get('eer_threshold', None)
+
+        temporal_dim = val_temporal.shape[1]
+
+        val_dataset = STMGMDataset(
+            val_segments, val_temporal, augment=False,
+            hypo_threshold=hypo_threshold, verbose=False,
+        )
         val_loader = DataLoader(
             val_dataset, batch_size=64, shuffle=False,
             collate_fn=stmgm_collate_fn, num_workers=0,
         )
 
         model = STMGMModel(temporal_dim=temporal_dim).to(device)
-        model.load_state_dict(torch.load(model_path, map_location=device))
+        model.load_state_dict(state_dict)
 
-        results = evaluate_fold(model, val_loader, device)
+        results = evaluate_fold(
+            model, val_loader, device,
+            glucose_mean=glucose_mean,
+            glucose_std=glucose_std,
+            fixed_threshold=fixed_threshold,
+        )
 
         # Print results
         print(f"  Classification: AUC={results['auc']:.4f}, F1={results['f1']:.4f}, "
@@ -199,7 +348,10 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
               f"Acc={results['acc']:.4f}")
         print(f"  Regression:     RMSE={results['rmse']:.2f} mg/dL, "
               f"MAE={results['mae']:.2f} mg/dL, MARD={results['mard']:.2f}%")
-        print(f"  EER Threshold:  {results['eer_threshold']:.4f}")
+        print(f"  Parkes Grid:    A+B={results['parkes_ab']:.2f}% "
+              f"(Zone A={results['parkes_zone_a']:.2f}%, Zone B={results['parkes_zone_b']:.2f}%)")
+        print(f"  Threshold:      train_eer={results['eer_threshold']:.4f} "
+              f"(val_eer={results['val_eer_threshold']:.4f})")
 
         # Store without raw predictions for summary
         metrics_list.append({
@@ -211,6 +363,9 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
             'rmse': results['rmse'],
             'mae': results['mae'],
             'mard': results['mard'],
+            'parkes_zone_a': results['parkes_zone_a'],
+            'parkes_zone_b': results['parkes_zone_b'],
+            'parkes_ab': results['parkes_ab'],
         })
 
         all_results[fold_name] = results
@@ -225,10 +380,16 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
         print(f"  Average Results ({len(metrics_list)} folds)")
         print(f"{'='*60}")
 
-        for metric in ['auc', 'f1', 'sensitivity', 'specificity', 'acc', 'rmse', 'mae', 'mard']:
+        for metric in ['auc', 'f1', 'sensitivity', 'specificity', 'acc',
+                       'rmse', 'mae', 'mard', 'parkes_zone_a', 'parkes_zone_b', 'parkes_ab']:
             values = [m[metric] for m in metrics_list]
-            unit = ' mg/dL' if metric in ['rmse', 'mae'] else '%' if metric == 'mard' else ''
-            print(f"  {metric.upper():12s}: {np.mean(values):.4f} ± {np.std(values):.4f}{unit}")
+            if metric in ['rmse', 'mae']:
+                unit = ' mg/dL'
+            elif metric in ['mard', 'parkes_zone_a', 'parkes_zone_b', 'parkes_ab']:
+                unit = '%'
+            else:
+                unit = ''
+            print(f"  {metric.upper():14s}: {np.mean(values):.4f} ± {np.std(values):.4f}{unit}")
 
     # Save results
     eval_path = os.path.join(model_dir, 'evaluation_results.json')

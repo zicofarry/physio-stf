@@ -160,6 +160,41 @@ def _simple_ppg_peak_detect(ppg_signal, fs=64):
     return peaks
 
 
+def compute_clean_beat_template(beats, corr_threshold=0.5):
+    """
+    Compute a clean representative template beat/pulse from a 5-minute window
+    using pointwise median after rejecting low-correlation artifact beats.
+    """
+    beats_arr = np.stack(beats, axis=0).astype(np.float32)
+    if len(beats_arr) == 1:
+        return beats_arr[0]
+
+    median_template = np.median(beats_arr, axis=0)
+    centered_beats = beats_arr - np.mean(beats_arr, axis=1, keepdims=True)
+    centered_med = median_template - np.mean(median_template)
+    med_norm = np.linalg.norm(centered_med)
+
+    if med_norm > 1e-8:
+        beat_norms = np.linalg.norm(centered_beats, axis=1)
+        valid_norms = beat_norms > 1e-8
+        corrs = np.zeros(len(beats_arr), dtype=np.float32)
+        corrs[valid_norms] = (
+            (centered_beats[valid_norms] @ centered_med)
+            / (beat_norms[valid_norms] * med_norm)
+        )
+        clean_mask = corrs >= corr_threshold
+        min_keep = max(1, min(3, len(beats_arr)))
+        if np.sum(clean_mask) >= min_keep:
+            clean_beats = beats_arr[clean_mask]
+        else:
+            top_k = max(1, len(beats_arr) // 2)
+            top_idx = np.argsort(-corrs)[:top_k]
+            clean_beats = beats_arr[top_idx]
+        return np.median(clean_beats, axis=0).astype(np.float32)
+
+    return median_template.astype(np.float32)
+
+
 # ============================================================
 # Main Pipeline
 # ============================================================
@@ -246,10 +281,9 @@ if __name__ == '__main__':
                 skip_count += 1
                 continue
 
-        # Use median beat/pulse as representative
-        # (during training, individual beats could be used for augmentation)
-        representative_ecg = ecg_beats[len(ecg_beats) // 2]
-        representative_ppg = ppg_pulses[len(ppg_pulses) // 2]
+        # Compute clean median template beat/pulse across the 5-minute window
+        representative_ecg = compute_clean_beat_template(ecg_beats)
+        representative_ppg = compute_clean_beat_template(ppg_pulses)
 
         all_segments.append({
             'ecg_beat': representative_ecg,
@@ -271,103 +305,111 @@ if __name__ == '__main__':
         print("ERROR: No valid segments with all modalities!")
         sys.exit(1)
 
-    # ===== Feature Selection for Temporal Features =====
-    print("\n--- Feature Selection (UFS + L1-FS + RFE) ---")
     temporal_matrix = np.array(all_temporal_raw, dtype=np.float32)
     glucose_array = np.array(glucose_list, dtype=np.float32)
     labels_cls = (glucose_array < args.hypo_threshold).astype(int)
-
     print(f"Raw temporal features: {temporal_matrix.shape}")
 
-    try:
-        selected_indices, selection_info = combined_feature_selection(
-            temporal_matrix, labels_cls, glucose_array, n_final=18
-        )
-        print(f"Selected {len(selected_indices)} temporal features")
-        print(f"  Indices: {selected_indices}")
-    except Exception as e:
-        print(f"WARNING: Feature selection failed ({e}), using first 18 features")
-        selected_indices = np.arange(min(18, temporal_matrix.shape[1]))
-
-    temporal_selected = temporal_matrix[:, selected_indices]
-
-    # ===== Save features =====
-    print("\n--- Saving features ---")
-
-    # Save segments
-    segments_path = os.path.join(out_dir, 'segments.pkl')
-    with open(segments_path, 'wb') as f:
-        pickle.dump(all_segments, f)
-    print(f"Saved segments.pkl ({len(all_segments)} segments)")
-
-    # Save temporal features
-    temporal_path = os.path.join(out_dir, 'temporal_features.pkl')
-    with open(temporal_path, 'wb') as f:
-        pickle.dump({
-            'raw': temporal_matrix,
-            'selected': temporal_selected,
-            'selected_indices': selected_indices,
-        }, f)
-    print(f"Saved temporal_features.pkl (raw: {temporal_matrix.shape}, selected: {temporal_selected.shape})")
-
-    # ===== Generate k-fold CV metadata =====
-    print(f"\n--- Generating {args.n_folds}-fold CV metadata ---")
+    # ===== Generate k-fold CV metadata & Per-Fold Feature Selection =====
+    print(f"\n--- Generating {args.n_folds}-fold CV metadata & Per-Fold Feature Selection ---")
     from sklearn.model_selection import StratifiedKFold, KFold
 
     valid_indices = list(range(len(all_segments)))
     labels = labels_cls
 
-    hypo_count = labels.sum()
+    hypo_count = int(labels.sum())
     normal_count = len(labels) - hypo_count
     print(f"Segments: {len(labels)} (hypo={hypo_count}, normal={normal_count})")
 
     metadata = {'folds': {}}
     indices_array = np.array(valid_indices)
+    fold_selected_indices = {}
 
     if len(labels) < 2:
         print("WARNING: Not enough samples for cross-validation. Creating a single fallback fold.")
-        metadata['folds']['v1'] = {
-            'train': [0],
-            'val': [0]
-        }
+        splits = [(np.array([0]), np.array([0]))]
     else:
         unique_classes = len(np.unique(labels))
-        if unique_classes > 1:
-            min_class = min(hypo_count, normal_count)
+        min_class = min(hypo_count, normal_count)
+        if unique_classes > 1 and min_class >= 2:
             n_folds = max(2, min(args.n_folds, int(min_class)))
             try:
                 splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+                splits = list(splitter.split(indices_array, labels))
                 print(f"Using StratifiedKFold with {n_folds} folds.")
             except ValueError:
                 n_folds = max(2, min(args.n_folds, len(labels)))
                 splitter = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+                splits = list(splitter.split(indices_array, labels))
                 print(f"Fallback to KFold with {n_folds} folds.")
         else:
             n_folds = max(2, min(args.n_folds, len(labels)))
             splitter = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-            print(f"WARNING: Only one class present. Using KFold with {n_folds} folds.")
+            splits = list(splitter.split(indices_array, labels))
+            print(f"WARNING: Insufficient minority samples for stratification. Using KFold with {n_folds} folds.")
 
-        for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(indices_array, labels)):
-            version = f"v{fold_idx + 1}"
-            train_indices = [int(indices_array[i]) for i in train_idx]
-            val_indices = [int(indices_array[i]) for i in val_idx]
-            metadata['folds'][version] = {
-                'train': train_indices,
-                'val': val_indices,
-            }
-            train_hypo = sum(1 for i in train_idx if labels[i] == 1)
-            val_hypo = sum(1 for i in val_idx if labels[i] == 1)
-            print(f"  {version}: train={len(train_indices)} (hypo={train_hypo}), "
-                  f"val={len(val_indices)} (hypo={val_hypo})")
+    for fold_idx, (train_idx, val_idx) in enumerate(splits):
+        version = f"v{fold_idx + 1}"
+        train_indices = [int(indices_array[i]) for i in train_idx]
+        val_indices = [int(indices_array[i]) for i in val_idx]
+
+        try:
+            sel_idx, _ = combined_feature_selection(
+                temporal_matrix[train_indices],
+                labels_cls[train_indices],
+                glucose_array[train_indices],
+                n_final=18,
+            )
+        except Exception as e:
+            print(f"  WARNING ({version}): Feature selection failed ({e}), using first 18 features")
+            sel_idx = np.arange(min(18, temporal_matrix.shape[1]), dtype=int)
+
+        fold_selected_indices[version] = [int(x) for x in sel_idx]
+
+        metadata['folds'][version] = {
+            'train': train_indices,
+            'val': val_indices,
+            'selected_indices': fold_selected_indices[version],
+        }
+        train_hypo = sum(1 for i in train_idx if labels[i] == 1)
+        val_hypo = sum(1 for i in val_idx if labels[i] == 1)
+        print(f"  {version}: train={len(train_indices)} (hypo={train_hypo}), "
+              f"val={len(val_indices)} (hypo={val_hypo}), "
+              f"selected_features={len(sel_idx)}")
+
+    default_selected = np.array(
+        fold_selected_indices.get('v1', list(range(min(18, temporal_matrix.shape[1])))),
+        dtype=int,
+    )
+    temporal_selected = temporal_matrix[:, default_selected]
+
+    # ===== Save features =====
+    print("\n--- Saving features ---")
+
+    segments_path = os.path.join(out_dir, 'segments.pkl')
+    with open(segments_path, 'wb') as f:
+        pickle.dump(all_segments, f)
+    print(f"Saved segments.pkl ({len(all_segments)} segments)")
+
+    temporal_path = os.path.join(out_dir, 'temporal_features.pkl')
+    with open(temporal_path, 'wb') as f:
+        pickle.dump({
+            'raw': temporal_matrix,
+            'selected': temporal_selected,
+            'selected_indices': default_selected,
+            'fold_selected_indices': fold_selected_indices,
+        }, f)
+    print(f"Saved temporal_features.pkl (raw: {temporal_matrix.shape}, per-fold selected: {len(default_selected)})")
 
     metadata['signal_specs'] = {
         'ecg_beat_len': len(all_segments[0]['ecg_beat']),
         'ppg_pulse_len': len(all_segments[0]['ppg_pulse']),
         'eda_len': len(all_segments[0]['eda']),
-        'temporal_dim': len(selected_indices),
+        'temporal_dim': len(default_selected),
     }
     metadata['hypo_threshold'] = args.hypo_threshold
-    metadata['selected_feature_indices'] = selected_indices.tolist()
+    metadata['selected_feature_indices'] = default_selected.tolist()
+    metadata['fold_selected_indices'] = fold_selected_indices
 
     metadata_path = os.path.join(out_dir, 'metadata.json')
     with open(metadata_path, 'w') as f:

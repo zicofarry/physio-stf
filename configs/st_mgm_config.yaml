@@ -69,10 +69,11 @@ training:
   patience: 20
   optimizer: "adamw"
   scheduler: "cosine"
-  classification_loss: "bce"
+  classification_loss: "bce_with_logits"
   regression_loss: "mse"
   loss_alpha: 0.5           # weight for classification loss
   loss_beta: 0.5            # weight for regression loss
+  max_grad_norm: 1.0        # gradient clipping norm
   seed: 42
   num_workers: 4
   n_folds: 5

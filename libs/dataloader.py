@@ -62,7 +62,8 @@ class STMGMDataset(Dataset):
     """
 
     def __init__(self, segments, temporal_features=None, feature_indices=None,
-                 augment=False, hypo_threshold=70, verbose=True):
+                 augment=False, hypo_threshold=70, glucose_mean=0.0, glucose_std=1.0,
+                 verbose=True):
         """
         Args:
             segments: list of dicts, each containing:
@@ -71,10 +72,12 @@ class STMGMDataset(Dataset):
                 - 'eda': numpy array of EDA signal (1200 samples)
                 - 'glucose': float glucose value
                 - 'segment_idx': int segment identifier
-            temporal_features: numpy array (N, 160) of DWT features, or None
+            temporal_features: numpy array (N, D) of DWT features, or None
             feature_indices: numpy array of selected temporal feature indices
             augment: whether to apply data augmentation
             hypo_threshold: glucose threshold for hypoglycemia (default 70 mg/dL)
+            glucose_mean: mean for target glucose standardization (default 0.0)
+            glucose_std: std for target glucose standardization (default 1.0)
             verbose: print dataset info
         """
         self.segments = segments
@@ -82,16 +85,22 @@ class STMGMDataset(Dataset):
         self.feature_indices = feature_indices
         self.augment = augment
         self.hypo_threshold = hypo_threshold
+        self.glucose_mean = float(glucose_mean)
+        self.glucose_std = float(glucose_std) if float(glucose_std) > 1e-6 else 1.0
 
-        # Compute labels
+        # Compute binary labels from raw glucose (mg/dL)
         self.labels = np.array([
             1.0 if seg['glucose'] < hypo_threshold else 0.0
             for seg in segments
         ], dtype=np.float32)
 
-        self.glucose_values = np.array([
+        self.raw_glucose_values = np.array([
             seg['glucose'] for seg in segments
         ], dtype=np.float32)
+
+        self.glucose_values = (
+            (self.raw_glucose_values - self.glucose_mean) / self.glucose_std
+        ).astype(np.float32)
 
         # Class statistics
         hypo_count = int(self.labels.sum())
