@@ -29,7 +29,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_curve, roc_auc_score
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from libs.st_mgm_model import STMGMModel, STMGMFusionOnly, MultiTaskLoss
@@ -38,7 +38,10 @@ from libs.dwt_features import combined_feature_selection
 
 
 def find_eer_threshold(targets, probs):
-    """Find probability threshold at Equal Error Rate (FPR == FNR) with finite-value guard."""
+    """
+    Find optimal probability threshold balancing F1-score and Youden's J (TPR - FPR)
+    with finite-value guard.
+    """
     targets = np.asarray(targets).reshape(-1)
     probs = np.asarray(probs).reshape(-1)
     if len(targets) == 0 or len(np.unique(targets)) < 2 or np.allclose(probs, probs[0]):
@@ -50,9 +53,18 @@ def find_eer_threshold(targets, probs):
     fpr = fpr[finite_mask]
     tpr = tpr[finite_mask]
     thresholds = thresholds[finite_mask]
-    fnr = 1.0 - tpr
-    eer_idx = int(np.nanargmin(np.abs(fpr - fnr)))
-    thr = float(thresholds[eer_idx])
+
+    n_pos = float(np.sum(targets == 1))
+    n_neg = float(np.sum(targets == 0))
+    tp = tpr * n_pos
+    fp = fpr * n_neg
+    fn = (1.0 - tpr) * n_pos
+    f1_scores = (2.0 * tp) / np.maximum(2.0 * tp + fp + fn, 1e-8)
+    youden_j = tpr - fpr
+
+    combined_score = 0.5 * f1_scores + 0.5 * youden_j
+    best_idx = int(np.nanargmax(combined_score))
+    thr = float(thresholds[best_idx])
     return float(np.clip(thr, 1e-6, 1.0 - 1e-6))
 
 
@@ -341,13 +353,13 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
         if glucose_std < 1e-6:
             glucose_std = 1.0
 
-        # 4. Compute class imbalance pos_weight on train fold
+        # 4. Compute tempered class imbalance pos_weight on train fold
         train_hypo_count = int(train_labels_cls.sum())
         train_normal_count = len(train_labels_cls) - train_hypo_count
         raw_ratio = train_normal_count / max(train_hypo_count, 1)
-        pos_weight_val = float(np.clip(raw_ratio, 1.0, 50.0))
+        pos_weight_val = float(np.clip(np.sqrt(raw_ratio), 1.0, 10.0))
         print(f"  Train glucose: mean={glucose_mean:.2f}, std={glucose_std:.2f} mg/dL | "
-              f"pos_weight={pos_weight_val:.2f}")
+              f"pos_weight={pos_weight_val:.2f} (raw_ratio={raw_ratio:.1f})")
 
         # Create datasets with normalized target glucose
         train_dataset = STMGMDataset(
@@ -388,13 +400,21 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
             num_workers=0,
         )
 
-        # Create model & criterion with pos_weight
-        model = STMGMModel(temporal_dim=temporal_dim).to(device)
+        # Create model & criterion with pos_weight and threshold-aware coupling
+        model = STMGMModel(temporal_dim=temporal_dim)
+        model.set_reg_threshold(
+            hypo_threshold=hypo_threshold,
+            glucose_mean=glucose_mean,
+            glucose_std=glucose_std,
+        )
+        model = model.to(device)
+
         optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
         pos_weight_tensor = torch.tensor([pos_weight_val], dtype=torch.float32, device=device)
         criterion = MultiTaskLoss(alpha=alpha, beta=beta, pos_weight=pos_weight_tensor).to(device)
 
+        best_val_score = float('inf')
         best_val_loss = float('inf')
         patience_counter = 0
         best_model_state = None
@@ -406,8 +426,20 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
             val_metrics = evaluate_e2e(model, val_loader, criterion, device)
             scheduler.step()
 
-            if val_metrics['loss'] < best_val_loss:
-                best_val_loss = val_metrics['loss']
+            try:
+                if len(np.unique(val_metrics['cls_labels'])) > 1:
+                    val_auc = float(roc_auc_score(val_metrics['cls_labels'], val_metrics['cls_preds']))
+                else:
+                    val_auc = 0.5
+            except Exception:
+                val_auc = 0.5
+
+            # Combined validation criterion: normalized regression loss + (1 - AUC)
+            val_score = float(val_metrics['reg_loss']) + 0.5 * (1.0 - val_auc)
+
+            if val_score < best_val_score:
+                best_val_score = val_score
+                best_val_loss = float(val_metrics['loss'])
                 best_model_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
                 patience_counter = 0
             else:
@@ -417,13 +449,14 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
                 print(f"  Epoch {epoch:3d}/{epochs}: "
                       f"train_loss={train_metrics['loss']:.4f} "
                       f"(cls={train_metrics['cls_loss']:.4f}, reg={train_metrics['reg_loss']:.4f}) | "
-                      f"val_loss={val_metrics['loss']:.4f}")
+                      f"val_loss={val_metrics['loss']:.4f} "
+                      f"(reg={val_metrics['reg_loss']:.4f}, auc={val_auc:.4f})")
 
             if patience_counter >= patience:
                 print(f"  Early stopping at epoch {epoch}")
                 break
 
-        # Compute EER threshold on training fold using best model (no val leakage)
+        # Compute optimal threshold on training fold using best model (no val leakage)
         train_eer_threshold = 0.5
         if best_model_state is not None:
             model.load_state_dict(best_model_state)
@@ -448,10 +481,12 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
             }
             torch.save(checkpoint_payload, model_path)
             print(f"  Saved best model → {model_path} "
-                  f"(val_loss={best_val_loss:.4f}, train_eer_thr={train_eer_threshold:.4f})")
+                  f"(val_score={best_val_score:.4f}, val_loss={best_val_loss:.4f}, "
+                  f"train_thr={train_eer_threshold:.4f})")
 
         all_fold_results[fold_name] = {
             'best_val_loss': float(best_val_loss),
+            'best_val_score': float(best_val_score),
             'epochs_trained': int(epoch),
             'selected_indices': fold_sel_idx.tolist(),
             'temporal_mean': feat_mean.tolist(),

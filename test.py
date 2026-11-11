@@ -40,7 +40,10 @@ from libs.dataloader import STMGMDataset, stmgm_collate_fn
 # ============================================================
 
 def find_eer_threshold(targets, probs):
-    """Find probability threshold at Equal Error Rate (where FPR == FNR) with finite-value guard."""
+    """
+    Find optimal probability threshold balancing F1-score and Youden's J (TPR - FPR)
+    with finite-value guard.
+    """
     targets = np.asarray(targets).reshape(-1)
     probs = np.asarray(probs).reshape(-1)
     if len(targets) == 0 or len(np.unique(targets)) < 2 or np.allclose(probs, probs[0]):
@@ -52,9 +55,18 @@ def find_eer_threshold(targets, probs):
     fpr = fpr[finite_mask]
     tpr = tpr[finite_mask]
     thresholds = thresholds[finite_mask]
-    fnr = 1.0 - tpr
-    eer_idx = int(np.nanargmin(np.abs(fpr - fnr)))
-    thr = float(thresholds[eer_idx])
+
+    n_pos = float(np.sum(targets == 1))
+    n_neg = float(np.sum(targets == 0))
+    tp = tpr * n_pos
+    fp = fpr * n_neg
+    fn = (1.0 - tpr) * n_pos
+    f1_scores = (2.0 * tp) / np.maximum(2.0 * tp + fp + fn, 1e-8)
+    youden_j = tpr - fpr
+
+    combined_score = 0.5 * f1_scores + 0.5 * youden_j
+    best_idx = int(np.nanargmax(combined_score))
+    thr = float(thresholds[best_idx])
     return float(np.clip(thr, 1e-6, 1.0 - 1e-6))
 
 
@@ -332,8 +344,14 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
             collate_fn=stmgm_collate_fn, num_workers=0,
         )
 
-        model = STMGMModel(temporal_dim=temporal_dim).to(device)
-        model.load_state_dict(state_dict)
+        model = STMGMModel(temporal_dim=temporal_dim)
+        model.set_reg_threshold(
+            hypo_threshold=hypo_threshold,
+            glucose_mean=glucose_mean,
+            glucose_std=glucose_std,
+        )
+        model = model.to(device)
+        model.load_state_dict(state_dict, strict=False)
 
         results = evaluate_fold(
             model, val_loader, device,

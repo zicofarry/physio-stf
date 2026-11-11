@@ -124,6 +124,11 @@ class ResNet1DBranch(nn.Module):
         if x.dim() == 2:
             x = x.unsqueeze(1)  # (batch, 1, seq_len)
 
+        # Per-beat Z-score normalization for amplitude-invariant morphology extraction
+        x_mean = x.mean(dim=-1, keepdim=True)
+        x_std = x.std(dim=-1, keepdim=True).clamp(min=1e-6)
+        x = (x - x_mean) / x_std
+
         x = self.stem(x)
         x = self.stages(x)
         x = self.gap(x).squeeze(-1)  # (batch, out_features)
@@ -156,13 +161,16 @@ class ResNet1D(nn.Module):
 
         concat_dim = self.ecg_branch.out_features + self.ppg_branch.out_features
 
-        # DNN Feature Compression
+        # DNN Feature Compression with LayerNorm and GELU
         self.dnn = nn.Sequential(
+            nn.LayerNorm(concat_dim),
             nn.Linear(concat_dim, dnn_hidden_1),
-            nn.ReLU(inplace=True),
+            nn.LayerNorm(dnn_hidden_1),
+            nn.GELU(),
             nn.Dropout(dnn_dropout_1),
             nn.Linear(dnn_hidden_1, dnn_hidden_2),
-            nn.ReLU(inplace=True),
+            nn.LayerNorm(dnn_hidden_2),
+            nn.GELU(),
             nn.Dropout(dnn_dropout_2),
             nn.Linear(dnn_hidden_2, output_features),
         )

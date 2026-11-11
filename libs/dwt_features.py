@@ -225,7 +225,7 @@ def select_features_ufs(features_matrix, n_keep=80):
 
 def select_features_l1(features_matrix, labels, alpha=0.01):
     """
-    L1-based Feature Selection using Lasso.
+    L1-based Feature Selection using Lasso on standardized features and targets.
 
     Args:
         features_matrix: (N_samples, N_features) array
@@ -241,11 +241,19 @@ def select_features_l1(features_matrix, labels, alpha=0.01):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(features_matrix)
 
-    lasso = Lasso(alpha=alpha, max_iter=5000, random_state=42)
-    lasso.fit(X_scaled, labels)
+    y_arr = np.asarray(labels, dtype=np.float64)
+    y_std = np.std(y_arr)
+    if y_std > 1e-8:
+        y_scaled = (y_arr - np.mean(y_arr)) / y_std
+    else:
+        y_scaled = y_arr - np.mean(y_arr)
+
+    eff_alpha = max(float(alpha), 0.02)
+    lasso = Lasso(alpha=eff_alpha, max_iter=10000, tol=1e-3, random_state=42)
+    lasso.fit(X_scaled, y_scaled)
 
     # Select features with non-zero coefficients
-    selected = np.where(np.abs(lasso.coef_) > 1e-6)[0]
+    selected = np.where(np.abs(lasso.coef_) > 1e-5)[0]
     if len(selected) == 0:
         # Fallback: select top features by absolute coefficient
         selected = np.argsort(-np.abs(lasso.coef_))[:20]

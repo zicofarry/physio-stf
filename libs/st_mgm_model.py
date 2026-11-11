@@ -63,6 +63,11 @@ class STMGMModel(nn.Module):
         self.resnet = ResNet1D(output_features=morph_output_dim)
         self.eda_encoder = EDAEncoder(output_features=eda_output_dim)
 
+        # Branch-level normalization to balance feature scales before fusion
+        self.norm_temporal = nn.LayerNorm(temporal_dim)
+        self.norm_morph = nn.LayerNorm(morph_output_dim)
+        self.norm_eda = nn.LayerNorm(eda_output_dim)
+
         # Fusion input dimension
         fusion_dim = temporal_dim + morph_output_dim + eda_output_dim
 
@@ -79,11 +84,24 @@ class STMGMModel(nn.Module):
             nn.Dropout(shared_dropout_2),
         )
 
+        # Residual skip projection from 5-min DWT temporal features
+        self.temporal_skip = nn.Linear(temporal_dim, shared_hidden_2)
+
         # Classification Head: Hypo (1) / Normal (0) — outputs raw logits
         self.cls_head = nn.Linear(shared_hidden_2, 1)
 
         # Regression Head: BG value (normalized during training)
         self.reg_head = nn.Linear(shared_hidden_2, 1)
+
+        # Threshold-aware regression-to-classification logit coupling
+        self.register_buffer('reg_threshold', torch.tensor(-1.0, dtype=torch.float32))
+        self.reg_logit_scale = nn.Parameter(torch.tensor(1.5, dtype=torch.float32))
+
+    def set_reg_threshold(self, hypo_threshold=70.0, glucose_mean=0.0, glucose_std=1.0):
+        """Set normalized hypoglycemia threshold for regression-classification coupling."""
+        std_safe = max(float(glucose_std), 1e-6)
+        z_thr = (float(hypo_threshold) - float(glucose_mean)) / std_safe
+        self.reg_threshold.fill_(z_thr)
 
     def forward(self, f_temporal, ecg_beats, ppg_pulses, eda_signal):
         """
@@ -99,19 +117,23 @@ class STMGMModel(nn.Module):
             cls_logits: (batch, 1) — classification logits (Hypo/Normal)
             reg_value:  (batch, 1) — predicted glucose value
         """
-        # Extract deep features
-        f_morph = self.resnet(ecg_beats, ppg_pulses)  # (batch, 40)
-        f_eda = self.eda_encoder(eda_signal)           # (batch, 64)
+        # Extract and normalize branch features
+        f_temp_norm = self.norm_temporal(f_temporal)                    # (batch, ~18)
+        f_morph = self.norm_morph(self.resnet(ecg_beats, ppg_pulses))   # (batch, 40)
+        f_eda = self.norm_eda(self.eda_encoder(eda_signal))             # (batch, 64)
 
         # Feature fusion (concatenation)
-        f_fusion = torch.cat([f_temporal, f_morph, f_eda], dim=1)  # (batch, ~122)
+        f_fusion = torch.cat([f_temp_norm, f_morph, f_eda], dim=1)      # (batch, ~122)
 
-        # Shared MLP
-        shared = self.shared_mlp(f_fusion)  # (batch, 32)
+        # Shared MLP with temporal residual connection
+        shared = self.shared_mlp(f_fusion) + self.temporal_skip(f_temp_norm)  # (batch, 32)
 
-        # Dual output heads
-        cls_logits = self.cls_head(shared)  # (batch, 1)
-        reg_value = self.reg_head(shared)   # (batch, 1)
+        # Dual output heads with threshold-aware coupling
+        reg_value = self.reg_head(shared)  # (batch, 1)
+        cls_logits = (
+            self.cls_head(shared)
+            + F.softplus(self.reg_logit_scale) * (self.reg_threshold - reg_value)
+        )  # (batch, 1)
 
         return cls_logits, reg_value
 
@@ -141,6 +163,10 @@ class STMGMFusionOnly(nn.Module):
 
         fusion_dim = temporal_dim + morph_dim + eda_dim
 
+        self.norm_temporal = nn.LayerNorm(temporal_dim)
+        self.norm_morph = nn.LayerNorm(morph_dim)
+        self.norm_eda = nn.LayerNorm(eda_dim)
+
         self.shared_mlp = nn.Sequential(
             nn.LayerNorm(fusion_dim),
             nn.Linear(fusion_dim, shared_hidden_1),
@@ -153,9 +179,17 @@ class STMGMFusionOnly(nn.Module):
             nn.Dropout(shared_dropout_2),
         )
 
+        self.temporal_skip = nn.Linear(temporal_dim, shared_hidden_2)
         self.cls_head = nn.Linear(shared_hidden_2, 1)
-
         self.reg_head = nn.Linear(shared_hidden_2, 1)
+
+        self.register_buffer('reg_threshold', torch.tensor(-1.0, dtype=torch.float32))
+        self.reg_logit_scale = nn.Parameter(torch.tensor(1.5, dtype=torch.float32))
+
+    def set_reg_threshold(self, hypo_threshold=70.0, glucose_mean=0.0, glucose_std=1.0):
+        std_safe = max(float(glucose_std), 1e-6)
+        z_thr = (float(hypo_threshold) - float(glucose_mean)) / std_safe
+        self.reg_threshold.fill_(z_thr)
 
     def forward(self, f_temporal, f_morph, f_eda):
         """
@@ -168,10 +202,16 @@ class STMGMFusionOnly(nn.Module):
             cls_logits: (batch, 1)
             reg_value:  (batch, 1)
         """
-        f_fusion = torch.cat([f_temporal, f_morph, f_eda], dim=1)
-        shared = self.shared_mlp(f_fusion)
-        cls_logits = self.cls_head(shared)
+        f_temp_norm = self.norm_temporal(f_temporal)
+        f_morph_norm = self.norm_morph(f_morph)
+        f_eda_norm = self.norm_eda(f_eda)
+        f_fusion = torch.cat([f_temp_norm, f_morph_norm, f_eda_norm], dim=1)
+        shared = self.shared_mlp(f_fusion) + self.temporal_skip(f_temp_norm)
         reg_value = self.reg_head(shared)
+        cls_logits = (
+            self.cls_head(shared)
+            + F.softplus(self.reg_logit_scale) * (self.reg_threshold - reg_value)
+        )
         return cls_logits, reg_value
 
 
@@ -182,7 +222,7 @@ class STMGMFusionOnly(nn.Module):
 class MultiTaskLoss(nn.Module):
     """
     Combined loss for multi-task learning:
-        L = alpha * BCEWithLogits(cls_logits, cls_label) + beta * MSE(reg_pred, reg_label)
+        L = alpha * BCEWithLogits(cls_logits, cls_label) + beta * (0.5 * MSE + 0.5 * SmoothL1)
     """
 
     def __init__(self, alpha=0.5, beta=0.5, pos_weight=None):
@@ -196,6 +236,7 @@ class MultiTaskLoss(nn.Module):
         else:
             self.bce = nn.BCEWithLogitsLoss()
         self.mse = nn.MSELoss()
+        self.huber = nn.SmoothL1Loss(beta=1.0)
 
     def forward(self, cls_pred, cls_label, reg_pred, reg_label):
         """
@@ -206,9 +247,9 @@ class MultiTaskLoss(nn.Module):
             reg_label: (batch,) or (batch, 1) — target glucose values (normalized)
 
         Returns:
-            total_loss: weighted sum of BCEWithLogits + MSE
+            total_loss: weighted sum of BCEWithLogits + regression loss
             cls_loss: BCEWithLogits loss
-            reg_loss: MSE loss
+            reg_loss: combined MSE + SmoothL1 loss
         """
         if cls_label.dim() == 1:
             cls_label = cls_label.unsqueeze(1)
@@ -216,7 +257,8 @@ class MultiTaskLoss(nn.Module):
             reg_label = reg_label.unsqueeze(1)
 
         cls_loss = self.bce(cls_pred, cls_label.float())
-        reg_loss = self.mse(reg_pred, reg_label.float())
+        reg_target = reg_label.float()
+        reg_loss = 0.5 * self.mse(reg_pred, reg_target) + 0.5 * self.huber(reg_pred, reg_target)
 
         total_loss = self.alpha * cls_loss + self.beta * reg_loss
         return total_loss, cls_loss, reg_loss
