@@ -234,15 +234,17 @@ def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, 
 # Main Evaluation
 # ============================================================
 
-def test_subject(subject, data_dir='./data', results_dir='./results'):
-    """Evaluate all folds for a subject."""
+def test_subject(subject, data_dir='./data', results_dir='./results', variant='M9'):
+    """Evaluate all folds for a subject (supports variant folders)."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"\nUsing device: {device}")
 
     meta_path = os.path.join(data_dir, subject, 'metadata.json')
     segments_path = os.path.join(data_dir, subject, 'segments.pkl')
     temporal_path = os.path.join(data_dir, subject, 'temporal_features.pkl')
-    model_dir = os.path.join(results_dir, subject)
+
+    variant_name = variant.upper()
+    model_dir = os.path.join(results_dir, subject) if variant_name == 'M9' else os.path.join(results_dir, f"{subject}_{variant_name.lower()}")
     summary_path = os.path.join(model_dir, 'training_summary.json')
 
     if not os.path.exists(meta_path):
@@ -344,7 +346,8 @@ def test_subject(subject, data_dir='./data', results_dir='./results'):
             collate_fn=stmgm_collate_fn, num_workers=0,
         )
 
-        model = STMGMModel(temporal_dim=temporal_dim)
+        fold_variant = fold_meta.get('variant', variant_name)
+        model = STMGMModel(temporal_dim=temporal_dim, variant=fold_variant)
         model.set_reg_threshold(
             hypo_threshold=hypo_threshold,
             glucose_mean=glucose_mean,
@@ -430,6 +433,9 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--subject', type=str, required=True, help='Subject ID')
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--results_dir', type=str, default='./results')
+    parser.add_argument('--variant', type=str, default='M9',
+                        choices=['M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9', 'm1', 'm2', 'm3', 'm6', 'm7', 'm8', 'm9'],
+                        help='Ablation variant folder to evaluate')
     args = parser.parse_args()
 
-    test_subject(args.subject, args.data_dir, args.results_dir)
+    test_subject(args.subject, args.data_dir, args.results_dir, args.variant)

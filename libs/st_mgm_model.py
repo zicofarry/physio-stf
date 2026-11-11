@@ -34,15 +34,18 @@ from libs.eda_encoder import EDAEncoder
 
 class STMGMModel(nn.Module):
     """
-    Spatiotemporal Multimodal Glucose Monitor — Full Model.
+    Spatiotemporal Multimodal Glucose Monitor — Full Model & Ablation Variants.
 
-    Combines:
-        - F_temporal:       Pre-extracted DWT statistical features (~18 dim)
-        - F_morphological:  1D-ResNet embeddings from ECG+PPG beats (40 dim)
-        - F_eda:            Conv1D+BiLSTM embeddings from EDA signal (64 dim)
-
-    Total fusion input: ~122 features
-    Outputs: (classification_prob, regression_value)
+    Variants:
+        - M1: Temporal DWT only
+        - M2: Spatial Morphological (1D-ResNet ECG+PPG) only
+        - M3: EDA (Conv1D+BiLSTM) only
+        - M4: ECG only (DWT ECG + ResNet ECG)
+        - M5: PPG only (DWT PPG + ResNet PPG)
+        - M6: No EDA (ECG + PPG: Temporal + Morphological)
+        - M7: No Temporal (ResNet Morph + EDA BiLSTM)
+        - M8: No ResNet (Temporal DWT + EDA BiLSTM)
+        - M9: Full ST-MGM (Temporal + Morphological + EDA)
     """
 
     def __init__(self,
@@ -52,24 +55,36 @@ class STMGMModel(nn.Module):
                  shared_hidden_1=64,
                  shared_dropout_1=0.3,
                  shared_hidden_2=32,
-                 shared_dropout_2=0.2):
+                 shared_dropout_2=0.2,
+                 variant='M9'):
         super().__init__()
 
         self.temporal_dim = temporal_dim
         self.morph_output_dim = morph_output_dim
         self.eda_output_dim = eda_output_dim
+        self.variant = variant.upper()
 
-        # Sub-models for deep feature extraction
-        self.resnet = ResNet1D(output_features=morph_output_dim)
-        self.eda_encoder = EDAEncoder(output_features=eda_output_dim)
+        # Determine which branches are active
+        self.use_temporal = self.variant in ['M1', 'M6', 'M8', 'M9']
+        self.use_morph = self.variant in ['M2', 'M6', 'M7', 'M9']
+        self.use_eda = self.variant in ['M3', 'M7', 'M8', 'M9']
 
-        # Branch-level normalization to balance feature scales before fusion
-        self.norm_temporal = nn.LayerNorm(temporal_dim)
-        self.norm_morph = nn.LayerNorm(morph_output_dim)
-        self.norm_eda = nn.LayerNorm(eda_output_dim)
+        fusion_dim = 0
+        if self.use_temporal:
+            self.norm_temporal = nn.LayerNorm(temporal_dim)
+            self.temporal_skip = nn.Linear(temporal_dim, shared_hidden_2)
+            fusion_dim += temporal_dim
+        if self.use_morph:
+            self.resnet = ResNet1D(output_features=morph_output_dim)
+            self.norm_morph = nn.LayerNorm(morph_output_dim)
+            fusion_dim += morph_output_dim
+        if self.use_eda:
+            self.eda_encoder = EDAEncoder(output_features=eda_output_dim)
+            self.norm_eda = nn.LayerNorm(eda_output_dim)
+            fusion_dim += eda_output_dim
 
-        # Fusion input dimension
-        fusion_dim = temporal_dim + morph_output_dim + eda_output_dim
+        assert fusion_dim > 0, f"Variant {variant} has no active branches!"
+        self.fusion_dim = fusion_dim
 
         # Shared MLP with LayerNorm and GELU to prevent Dying ReLU
         self.shared_mlp = nn.Sequential(
@@ -83,9 +98,6 @@ class STMGMModel(nn.Module):
             nn.GELU(),
             nn.Dropout(shared_dropout_2),
         )
-
-        # Residual skip projection from 5-min DWT temporal features
-        self.temporal_skip = nn.Linear(temporal_dim, shared_hidden_2)
 
         # Classification Head: Hypo (1) / Normal (0) — outputs raw logits
         self.cls_head = nn.Linear(shared_hidden_2, 1)
@@ -105,35 +117,34 @@ class STMGMModel(nn.Module):
 
     def forward(self, f_temporal, ecg_beats, ppg_pulses, eda_signal):
         """
-        Full forward pass through all branches and fusion.
-
-        Args:
-            f_temporal:  (batch, ~18) — standardized DWT features
-            ecg_beats:   (batch, ecg_len) — representative ECG beats
-            ppg_pulses:  (batch, ppg_len) — representative PPG pulses
-            eda_signal:  (batch, 1200) — Z-score normalized EDA
-
-        Returns:
-            cls_logits: (batch, 1) — classification logits (Hypo/Normal)
-            reg_value:  (batch, 1) — predicted glucose value
+        Full forward pass through active branches and fusion.
         """
-        # Extract and normalize branch features
-        f_temp_norm = self.norm_temporal(f_temporal)                    # (batch, ~18)
-        f_morph = self.norm_morph(self.resnet(ecg_beats, ppg_pulses))   # (batch, 40)
-        f_eda = self.norm_eda(self.eda_encoder(eda_signal))             # (batch, 64)
+        branch_feats = []
 
-        # Feature fusion (concatenation)
-        f_fusion = torch.cat([f_temp_norm, f_morph, f_eda], dim=1)      # (batch, ~122)
+        if self.use_temporal:
+            f_temp_norm = self.norm_temporal(f_temporal)
+            branch_feats.append(f_temp_norm)
+        if self.use_morph:
+            f_morph = self.norm_morph(self.resnet(ecg_beats, ppg_pulses))
+            branch_feats.append(f_morph)
+        if self.use_eda:
+            f_eda = self.norm_eda(self.eda_encoder(eda_signal))
+            branch_feats.append(f_eda)
 
-        # Shared MLP with temporal residual connection
-        shared = self.shared_mlp(f_fusion) + self.temporal_skip(f_temp_norm)  # (batch, 32)
+        if len(branch_feats) > 1:
+            f_fusion = torch.cat(branch_feats, dim=1)
+        else:
+            f_fusion = branch_feats[0]
 
-        # Dual output heads with threshold-aware coupling
-        reg_value = self.reg_head(shared)  # (batch, 1)
+        shared = self.shared_mlp(f_fusion)
+        if self.use_temporal:
+            shared = shared + self.temporal_skip(f_temp_norm)
+
+        reg_value = self.reg_head(shared)
         cls_logits = (
             self.cls_head(shared)
             + F.softplus(self.reg_logit_scale) * (self.reg_threshold - reg_value)
-        )  # (batch, 1)
+        )
 
         return cls_logits, reg_value
 

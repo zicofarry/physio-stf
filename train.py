@@ -222,15 +222,16 @@ def load_config():
     return {}
 
 
-def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
+def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', variant='M9'):
     """
-    Train ST-MGM for a given subject.
+    Train ST-MGM or Ablation Variant for a given subject.
 
     Args:
         subject: Subject ID
         data_dir: Path to feature data
         out_dir: Output directory for models
         mode: 'e2e' (end-to-end) or 'fusion_only'
+        variant: Ablation variant ('M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9')
     """
     set_seed(42)
 
@@ -271,23 +272,24 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
     hypo_threshold = float(metadata.get('hypo_threshold', hypo_threshold))
 
     folds = metadata.get('folds', metadata)
-    save_dir = os.path.join(out_dir, subject)
+    variant_name = variant.upper()
+    save_dir = os.path.join(out_dir, subject) if variant_name == 'M9' else os.path.join(out_dir, f"{subject}_{variant_name.lower()}")
     os.makedirs(save_dir, exist_ok=True)
 
     # Training hyperparameters
     batch_size = training_cfg.get('batch_size', 32)
     epochs = training_cfg.get('epochs', 100)
     patience = training_cfg.get('patience', 20)
-    lr = training_cfg.get('lr', 0.001)
-    weight_decay = training_cfg.get('weight_decay', 0.0001)
+    lr = training_cfg.get('lr', 0.0005)
+    weight_decay = training_cfg.get('weight_decay', 0.001)
     alpha = training_cfg.get('loss_alpha', 0.5)
     beta = training_cfg.get('loss_beta', 0.5)
     max_grad_norm = float(training_cfg.get('max_grad_norm', 1.0))
 
-    print(f"\nTraining ST-MGM ({mode}) for {subject}")
+    print(f"\nTraining ST-MGM ({mode}, variant={variant_name}) for {subject}")
     print(f"  Target selected features: {n_selected_features}, Folds: {list(folds.keys())}")
     print(f"  LR: {lr}, Batch: {batch_size}, Epochs: {epochs}, Patience: {patience}")
-    print(f"  Loss weights: alpha={alpha} (BCEWithLogits), beta={beta} (MSE), grad_clip={max_grad_norm}")
+    print(f"  Loss weights: alpha={alpha} (BCEWithLogits), beta={beta} (MSE/Huber), grad_clip={max_grad_norm}")
 
     all_fold_results = {}
 
@@ -400,8 +402,8 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
             num_workers=0,
         )
 
-        # Create model & criterion with pos_weight and threshold-aware coupling
-        model = STMGMModel(temporal_dim=temporal_dim)
+        # Create model & criterion with pos_weight, variant support, and threshold coupling
+        model = STMGMModel(temporal_dim=temporal_dim, variant=variant_name)
         model.set_reg_threshold(
             hypo_threshold=hypo_threshold,
             glucose_mean=glucose_mean,
@@ -478,6 +480,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
                 'eer_threshold': float(train_eer_threshold),
                 'pos_weight': pos_weight_val,
                 'temporal_dim': temporal_dim,
+                'variant': variant_name,
             }
             torch.save(checkpoint_payload, model_path)
             print(f"  Saved best model → {model_path} "
@@ -495,6 +498,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e'):
             'glucose_std': glucose_std,
             'eer_threshold': float(train_eer_threshold),
             'pos_weight': pos_weight_val,
+            'variant': variant_name,
         }
 
         # Cleanup
@@ -521,6 +525,9 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='./data', help='Data directory')
     parser.add_argument('--out_dir', type=str, default='./results', help='Output directory')
     parser.add_argument('--mode', type=str, default='e2e', choices=['e2e', 'fusion_only'])
+    parser.add_argument('--variant', type=str, default='M9',
+                        choices=['M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9', 'm1', 'm2', 'm3', 'm6', 'm7', 'm8', 'm9'],
+                        help='Ablation variant (M1: DWT only, M2: ResNet only, M3: EDA only, M6: No EDA, M7: No DWT, M8: No ResNet, M9: Full)')
     args = parser.parse_args()
 
-    train_subject(args.subject, args.data_dir, args.out_dir, args.mode)
+    train_subject(args.subject, args.data_dir, args.out_dir, args.mode, args.variant)
