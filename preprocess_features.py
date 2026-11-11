@@ -321,32 +321,44 @@ if __name__ == '__main__':
     normal_count = len(labels) - hypo_count
     print(f"Segments: {len(labels)} (hypo={hypo_count}, normal={normal_count})")
 
-    unique_classes = len(np.unique(labels))
-    if unique_classes > 1:
-        min_class = min(hypo_count, normal_count)
-        n_folds = min(args.n_folds, max(2, int(min_class)))
-        splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
-        print(f"Using StratifiedKFold with {n_folds} folds.")
-    else:
-        n_folds = min(args.n_folds, max(2, len(labels)))
-        splitter = KFold(n_splits=n_folds, shuffle=True, random_state=42)
-        print(f"WARNING: Only one class present. Using KFold with {n_folds} folds.")
-
     metadata = {'folds': {}}
     indices_array = np.array(valid_indices)
 
-    for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(indices_array, labels)):
-        version = f"v{fold_idx + 1}"
-        train_indices = [int(indices_array[i]) for i in train_idx]
-        val_indices = [int(indices_array[i]) for i in val_idx]
-        metadata['folds'][version] = {
-            'train': train_indices,
-            'val': val_indices,
+    if len(labels) < 2:
+        print("WARNING: Not enough samples for cross-validation. Creating a single fallback fold.")
+        metadata['folds']['v1'] = {
+            'train': [0],
+            'val': [0]
         }
-        train_hypo = sum(1 for i in train_idx if labels[i] == 1)
-        val_hypo = sum(1 for i in val_idx if labels[i] == 1)
-        print(f"  {version}: train={len(train_indices)} (hypo={train_hypo}), "
-              f"val={len(val_indices)} (hypo={val_hypo})")
+    else:
+        unique_classes = len(np.unique(labels))
+        if unique_classes > 1:
+            min_class = min(hypo_count, normal_count)
+            n_folds = max(2, min(args.n_folds, int(min_class)))
+            try:
+                splitter = StratifiedKFold(n_splits=n_folds, shuffle=True, random_state=42)
+                print(f"Using StratifiedKFold with {n_folds} folds.")
+            except ValueError:
+                n_folds = max(2, min(args.n_folds, len(labels)))
+                splitter = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+                print(f"Fallback to KFold with {n_folds} folds.")
+        else:
+            n_folds = max(2, min(args.n_folds, len(labels)))
+            splitter = KFold(n_splits=n_folds, shuffle=True, random_state=42)
+            print(f"WARNING: Only one class present. Using KFold with {n_folds} folds.")
+
+        for fold_idx, (train_idx, val_idx) in enumerate(splitter.split(indices_array, labels)):
+            version = f"v{fold_idx + 1}"
+            train_indices = [int(indices_array[i]) for i in train_idx]
+            val_indices = [int(indices_array[i]) for i in val_idx]
+            metadata['folds'][version] = {
+                'train': train_indices,
+                'val': val_indices,
+            }
+            train_hypo = sum(1 for i in train_idx if labels[i] == 1)
+            val_hypo = sum(1 for i in val_idx if labels[i] == 1)
+            print(f"  {version}: train={len(train_indices)} (hypo={train_hypo}), "
+                  f"val={len(val_indices)} (hypo={val_hypo})")
 
     metadata['signal_specs'] = {
         'ecg_beat_len': len(all_segments[0]['ecg_beat']),
