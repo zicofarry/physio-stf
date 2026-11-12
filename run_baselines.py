@@ -20,6 +20,7 @@ import json
 import pickle
 import random
 import argparse
+import subprocess
 import numpy as np
 
 import torch
@@ -119,7 +120,7 @@ class QuamerEDANet(nn.Module):
             x = x.unsqueeze(1)
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
-        x = x.transpose(1, 2)
+        x = x.transpose(1, 2).contiguous()
         _, (h_n, _) = self.lstm(x)
         h = torch.cat([h_n[-2], h_n[-1]], dim=1)
         return self.fc(h)
@@ -253,7 +254,7 @@ def run_tabular_baseline(model_type, folds, X_matrix, y_reg_all, y_cls_all):
     """Run SVM or Random Forest across 5 folds."""
     results = {}
     for fold_name, fold_info in folds.items():
-        seed_everything(42)
+        seed_everything(42, use_cuda=False)
         tr_idx = fold_info['train']
         va_idx = fold_info['val']
 
@@ -301,33 +302,36 @@ def run_tabular_baseline(model_type, folds, X_matrix, y_reg_all, y_cls_all):
     return results
 
 
-def run_quamer_baseline(folds, segments, device, epochs=30, lr=0.0005, batch_size=16):
-    """Train and evaluate Quamer et al. [23] late fusion baseline with robust GPU memory guard."""
+def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005, batch_size=32):
+    """Train and evaluate Quamer et al. [23] late fusion baseline."""
     class QuamerDataset(Dataset):
         def __init__(self, segs, hypo_thr=70.0):
-            self.segs = segs
-            self.ecg = [s['ecg_beat'] for s in segs]
-            self.ppg = [s['ppg_pulse'] for s in segs]
-            self.eda = [s['eda'] for s in segs]
+            self.n = len(segs)
+            self.ecg = torch.tensor(np.stack([s['ecg_beat'] for s in segs]), dtype=torch.float32)
+            self.ppg = torch.tensor(np.stack([s['ppg_pulse'] for s in segs]), dtype=torch.float32)
+            self.eda = torch.tensor(np.stack([s['eda'] for s in segs]), dtype=torch.float32)
             self.glucose = np.array([s['glucose'] for s in segs], dtype=np.float32)
             self.labels = (self.glucose < hypo_thr).astype(np.float32)
+            self.glucose_t = torch.tensor(self.glucose, dtype=torch.float32)
+            self.labels_t = torch.tensor(self.labels, dtype=torch.float32)
 
         def __len__(self):
-            return len(self.segs)
+            return self.n
 
         def __getitem__(self, i):
             return {
-                'ecg': torch.tensor(self.ecg[i], dtype=torch.float32),
-                'ppg': torch.tensor(self.ppg[i], dtype=torch.float32),
-                'eda': torch.tensor(self.eda[i], dtype=torch.float32),
-                'glucose': torch.tensor(self.glucose[i], dtype=torch.float32),
-                'label': torch.tensor(self.labels[i], dtype=torch.float32),
+                'ecg': self.ecg[i],
+                'ppg': self.ppg[i],
+                'eda': self.eda[i],
+                'glucose': self.glucose_t[i],
+                'label': self.labels_t[i],
             }
 
     results = {}
+    use_cuda = (device.type == 'cuda')
     for fold_name, fold_info in folds.items():
-        seed_everything(42)
-        if torch.cuda.is_available():
+        seed_everything(42, use_cuda=use_cuda)
+        if use_cuda and torch.cuda.is_available():
             torch.cuda.empty_cache()
 
         tr_idx = fold_info['train']
@@ -342,8 +346,8 @@ def run_quamer_baseline(folds, segments, device, epochs=30, lr=0.0005, batch_siz
         g = torch.Generator()
         g.manual_seed(42)
         tr_loader = DataLoader(tr_ds, batch_size=batch_size, shuffle=True, generator=g, pin_memory=False)
-        tr_eval_loader = DataLoader(tr_ds, batch_size=batch_size * 2, shuffle=False, pin_memory=False)
-        va_loader = DataLoader(va_ds, batch_size=batch_size * 2, shuffle=False, pin_memory=False)
+        tr_eval_loader = DataLoader(tr_ds, batch_size=64, shuffle=False, pin_memory=False)
+        va_loader = DataLoader(va_ds, batch_size=64, shuffle=False, pin_memory=False)
 
         model = QuamerFullLateFusion().to(device)
         opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
@@ -361,31 +365,31 @@ def run_quamer_baseline(folds, segments, device, epochs=30, lr=0.0005, batch_siz
 
         for ep in range(1, epochs + 1):
             model.train()
-            for b in tr_loader:
-                ecg = b['ecg'].to(device, non_blocking=True)
-                ppg = b['ppg'].to(device, non_blocking=True)
-                eda = b['eda'].to(device, non_blocking=True)
-                lbl = b['label'].to(device, non_blocking=True).unsqueeze(1)
-                glu = ((b['glucose'].to(device, non_blocking=True) - g_mean) / g_std).unsqueeze(1)
+            with torch.backends.cudnn.flags(enabled=False):
+                for b in tr_loader:
+                    ecg = b['ecg'].to(device, non_blocking=use_cuda)
+                    ppg = b['ppg'].to(device, non_blocking=use_cuda)
+                    eda = b['eda'].to(device, non_blocking=use_cuda)
+                    lbl = b['label'].to(device, non_blocking=use_cuda).unsqueeze(1)
+                    glu = ((b['glucose'].to(device, non_blocking=use_cuda) - g_mean) / g_std).unsqueeze(1)
 
-                opt.zero_grad()
-                c_pred, r_pred = model(ecg, ppg, eda)
-                loss = 0.5 * bce(c_pred, lbl) + 0.5 * mse(r_pred, glu)
-                loss.backward()
-                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                opt.step()
+                    opt.zero_grad()
+                    c_pred, r_pred = model(ecg, ppg, eda)
+                    loss = 0.5 * bce(c_pred, lbl) + 0.5 * mse(r_pred, glu)
+                    loss.backward()
+                    opt.step()
 
             # Validation step
             model.eval()
             val_loss = 0.0
             n_val = 0
-            with torch.no_grad():
+            with torch.no_grad(), torch.backends.cudnn.flags(enabled=False):
                 for b in va_loader:
-                    ecg = b['ecg'].to(device, non_blocking=True)
-                    ppg = b['ppg'].to(device, non_blocking=True)
-                    eda = b['eda'].to(device, non_blocking=True)
-                    lbl = b['label'].to(device, non_blocking=True).unsqueeze(1)
-                    glu = ((b['glucose'].to(device, non_blocking=True) - g_mean) / g_std).unsqueeze(1)
+                    ecg = b['ecg'].to(device, non_blocking=use_cuda)
+                    ppg = b['ppg'].to(device, non_blocking=use_cuda)
+                    eda = b['eda'].to(device, non_blocking=use_cuda)
+                    lbl = b['label'].to(device, non_blocking=use_cuda).unsqueeze(1)
+                    glu = ((b['glucose'].to(device, non_blocking=use_cuda) - g_mean) / g_std).unsqueeze(1)
                     c_pred, r_pred = model(ecg, ppg, eda)
                     l = 0.5 * bce(c_pred, lbl) + 0.5 * mse(r_pred, glu)
                     val_loss += l.item() * len(lbl)
@@ -402,22 +406,22 @@ def run_quamer_baseline(folds, segments, device, epochs=30, lr=0.0005, batch_siz
         # Calibrate classification threshold on training fold
         model.eval()
         tr_preds_prob = []
-        with torch.no_grad():
+        with torch.no_grad(), torch.backends.cudnn.flags(enabled=False):
             for b in tr_eval_loader:
-                ecg = b['ecg'].to(device, non_blocking=True)
-                ppg = b['ppg'].to(device, non_blocking=True)
-                eda = b['eda'].to(device, non_blocking=True)
+                ecg = b['ecg'].to(device, non_blocking=use_cuda)
+                ppg = b['ppg'].to(device, non_blocking=use_cuda)
+                eda = b['eda'].to(device, non_blocking=use_cuda)
                 c_pred, _ = model(ecg, ppg, eda)
                 tr_preds_prob.extend(torch.sigmoid(c_pred).reshape(-1).cpu().numpy().tolist())
         tr_thr = find_eer_threshold(tr_ds.labels, tr_preds_prob)
 
         # Final predictions on validation set
         va_preds_reg, va_preds_prob = [], []
-        with torch.no_grad():
+        with torch.no_grad(), torch.backends.cudnn.flags(enabled=False):
             for b in va_loader:
-                ecg = b['ecg'].to(device, non_blocking=True)
-                ppg = b['ppg'].to(device, non_blocking=True)
-                eda = b['eda'].to(device, non_blocking=True)
+                ecg = b['ecg'].to(device, non_blocking=use_cuda)
+                ppg = b['ppg'].to(device, non_blocking=use_cuda)
+                eda = b['eda'].to(device, non_blocking=use_cuda)
                 c_pred, r_pred = model(ecg, ppg, eda)
                 va_preds_prob.extend(torch.sigmoid(c_pred).reshape(-1).cpu().numpy().tolist())
                 r_mgdl = r_pred * g_std + g_mean
@@ -427,9 +431,11 @@ def run_quamer_baseline(folds, segments, device, epochs=30, lr=0.0005, batch_siz
             va_ds.glucose, va_preds_reg, va_ds.labels, va_preds_prob,
             fixed_thr=tr_thr, train_glucose_mean=g_mean, train_glucose_std=g_std,
         )
+        print(f"    [Quamer {fold_name}] AUC={metrics['auc']:.4f}, F1={metrics['f1']:.4f}, "
+              f"RMSE={metrics['rmse']:.2f} mg/dL, MARD={metrics['mard']:.2f}%", flush=True)
         results[fold_name] = metrics
         del model, opt, tr_ds, va_ds, tr_loader, va_loader, tr_eval_loader
-        if torch.cuda.is_available():
+        if use_cuda and torch.cuda.is_available():
             torch.cuda.empty_cache()
         gc.collect()
 
@@ -456,7 +462,6 @@ def summarize_results(res_dict):
 # ============================================================
 
 def main():
-    seed_everything(42)
     parser = argparse.ArgumentParser(description='ST-MGM: Run Baselines for Table 7')
     parser.add_argument('-s', '--subject', type=str, required=True, help='Subject ID')
     parser.add_argument('--data_dir', type=str, default='./data')
@@ -466,11 +471,21 @@ def main():
                         help='Cross-validation split mode (stratified or blocked)')
     parser.add_argument('--purge_gap', type=int, default=6,
                         help='Temporal purge gap (windows) around validation block in blocked CV')
-    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'cuda', 'cpu'],
-                        help='Compute device to run PyTorch models (default: auto)')
+    parser.add_argument('--device', type=str, default='cpu', choices=['auto', 'cuda', 'cpu'],
+                        help='Compute device for Quamer baseline (default: cpu to avoid RTX 5090 driver crash)')
     parser.add_argument('--skip_existing', action='store_true',
-                        help='Skip evaluation if evaluation_results.json already exists in target folder')
+                        help='Skip evaluation if valid evaluation_results.json already exists in target folder')
     args = parser.parse_args()
+
+    if args.device == 'cpu':
+        seed_everything(42, use_cuda=False)
+        device = torch.device('cpu')
+    elif args.device == 'cuda':
+        seed_everything(42, use_cuda=True)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        seed_everything(42, use_cuda=False)
+        device = torch.device('cpu')
 
     subject = args.subject
     cv_mode = args.cv_mode.lower()
@@ -504,16 +519,6 @@ def main():
     else:
         folds = metadata.get('stratified_folds', metadata.get('folds', metadata))
 
-    if args.device == 'cpu':
-        device = torch.device('cpu')
-    elif args.device == 'cuda':
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    else:
-        try:
-            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        except Exception:
-            device = torch.device('cpu')
-
     print(f"\n========================================================")
     print(f"  Running Baselines for {subject} (cv_mode={cv_mode}) on {device}")
     print(f"========================================================")
@@ -525,21 +530,16 @@ def main():
         out_folder = os.path.join(args.results_dir, folder_name)
         out_file = os.path.join(out_folder, 'evaluation_results.json')
 
-        if args.skip_existing and os.path.exists(out_file):
-            print(f"\n--- Skipping Baseline {m.upper()} for {subject} (already exists at {out_file}) ---")
+        if args.skip_existing and os.path.exists(out_file) and os.path.getsize(out_file) > 100:
+            print(f"\n--- Skipping Baseline {m.upper()} for {subject} (already exists at {out_file}) ---", flush=True)
             continue
 
-        os.makedirs(out_folder, exist_ok=True)
-        print(f"\n--- Running Baseline: {m.upper()} ({cv_mode}) ---")
+        print(f"\n--- Running Baseline: {m.upper()} ({cv_mode}, device={device}) ---", flush=True)
 
         if m in ['svm', 'rf']:
             res = run_tabular_baseline(m, folds, X_temporal, y_reg, y_cls)
         elif m == 'quamer':
-            try:
-                res = run_quamer_baseline(folds, segments, device)
-            except Exception as e:
-                print(f"  [Warning] Quamer failed on {device} ({e}), falling back to CPU...")
-                res = run_quamer_baseline(folds, segments, torch.device('cpu'))
+            res = run_quamer_baseline(folds, segments, device)
 
         pooled_oof = compute_pooled_oof_metrics(res)
         summ = summarize_results(res)
@@ -560,10 +560,11 @@ def main():
         if pooled_oof:
             save_res['pooled_oof'] = pooled_oof
 
+        os.makedirs(out_folder, exist_ok=True)
         out_file = os.path.join(out_folder, 'evaluation_results.json')
         with open(out_file, 'w') as f:
             json.dump(save_res, f, indent=2)
-        print(f"  Saved -> {out_file}")
+        print(f"  Saved -> {out_file}", flush=True)
 
 
 if __name__ == '__main__':

@@ -95,17 +95,20 @@ def find_eer_threshold(targets, probs):
 # Reproducibility
 # ============================================================
 
-def seed_everything(seed=42):
+def seed_everything(seed=42, use_cuda=True):
     """Set all random seeds for deterministic execution."""
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+    torch.default_generator.manual_seed(seed)
+    if use_cuda and torch.cuda.is_available():
+        try:
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+        except Exception:
+            pass
 
 
 set_seed = seed_everything
@@ -259,6 +262,7 @@ def train_subject(
     task_mode='multitask',
     cv_mode='stratified',
     purge_gap=6,
+    device_pref='auto',
 ):
     """
     Train ST-MGM or Ablation Variant for a given subject.
@@ -272,8 +276,10 @@ def train_subject(
         task_mode: 'multitask', 'cls_only', or 'reg_only'
         cv_mode: 'stratified' or 'blocked'
         purge_gap: Number of windows to purge around validation block in blocked CV
+        device_pref: Compute device preference ('auto', 'cuda', or 'cpu')
     """
-    seed_everything(42)
+    use_cuda = (device_pref != 'cpu')
+    seed_everything(42, use_cuda=use_cuda)
 
     config = load_config()
     training_cfg = config.get('training', {})
@@ -281,8 +287,10 @@ def train_subject(
     hypo_threshold = float(config.get('hypo_threshold', 70))
     n_selected_features = int(dwt_cfg.get('selected_features', 18))
 
-    if hasattr(train_subject, '_cli_device') and train_subject._cli_device in ['cuda', 'cpu']:
-        device = torch.device(train_subject._cli_device)
+    if device_pref == 'cpu':
+        device = torch.device('cpu')
+    elif device_pref == 'cuda':
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     else:
         try:
             device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -369,7 +377,7 @@ def train_subject(
         print(f"  Fold {fold_name}")
         print(f"{'='*50}")
 
-        seed_everything(42)
+        seed_everything(42, use_cuda=use_cuda)
 
         train_indices = fold_info.get('train', [])
         val_indices = fold_info.get('val', [])
@@ -636,4 +644,5 @@ if __name__ == '__main__':
         args.task_mode,
         args.cv_mode,
         args.purge_gap,
+        args.device,
     )

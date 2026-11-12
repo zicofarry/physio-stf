@@ -51,15 +51,17 @@ def has_all_checkpoints(results_dir, subject, variant='M9', cv_mode='stratified'
 
 
 def run_command(cmd, desc=""):
-    print(f"\n>>> [{time.strftime('%Y-%m-%d %H:%M:%S')}] {desc}")
-    print(f"    CMD: {' '.join(cmd)}")
+    print(f"\n>>> [{time.strftime('%Y-%m-%d %H:%M:%S')}] {desc}", flush=True)
+    print(f"    CMD: {' '.join(cmd)}", flush=True)
     t0 = time.time()
-    res = subprocess.run(cmd)
+    env = os.environ.copy()
+    env['PYTHONUNBUFFERED'] = '1'
+    res = subprocess.run(cmd, env=env)
     elapsed = time.time() - t0
     if res.returncode != 0:
-        print(f"!!! ERROR: Command failed with exit code {res.returncode} ({elapsed:.1f}s)")
+        print(f"!!! ERROR: Command failed with exit code {res.returncode} ({elapsed:.1f}s)", flush=True)
         return False
-    print(f"--- Finished successfully in {elapsed:.1f}s ---")
+    print(f"--- Finished successfully in {elapsed:.1f}s ---", flush=True)
     return True
 
 
@@ -168,6 +170,7 @@ def main():
                         '--variant', 'M9',
                         '--cv_mode', cv_mode,
                         '--purge_gap', str(args.purge_gap),
+                        '--device', args.device,
                     ],
                     desc=f"Training ST-MGM (M9, {cv_mode}) for {sub}",
                 )
@@ -200,6 +203,7 @@ def main():
                             '--variant', var,
                             '--cv_mode', cv_mode,
                             '--purge_gap', str(args.purge_gap),
+                            '--device', args.device,
                         ],
                         desc=f"Training Ablation {var} ({cv_mode}) for {sub}",
                     )
@@ -219,6 +223,7 @@ def main():
 
     # 5. Baselines Comparison (Table 7)
     if args.mode in ['baselines', 'full']:
+        baseline_device = 'cpu' if args.device == 'auto' else args.device
         for sub in subjects:
             cmd = [
                 sys.executable, 'run_baselines.py',
@@ -226,12 +231,12 @@ def main():
                 '--models', *args.models,
                 '--cv_mode', cv_mode,
                 '--purge_gap', str(args.purge_gap),
-                '--device', args.device,
+                '--device', baseline_device,
             ]
             if args.skip_existing:
                 cmd.append('--skip_existing')
-            run_command(cmd, desc=f"Running Baselines ({', '.join(args.models)}, {cv_mode}, device={args.device}) for {sub}")
-            cooldown(args.cooldown_sec)
+            run_command(cmd, desc=f"Running Baselines ({', '.join(args.models)}, {cv_mode}, device={baseline_device}) for {sub}")
+            cooldown(max(args.cooldown_sec // 4, 2))
 
     # 6. Dataset Table & Statistical Analysis
     if args.mode in ['analyze', 'full']:

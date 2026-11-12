@@ -38,17 +38,20 @@ from libs.dataloader import STMGMDataset, stmgm_collate_fn
 from preprocess_features import build_blocked_splits
 
 
-def seed_everything(seed=42):
+def seed_everything(seed=42, use_cuda=True):
     """Set all random seeds for deterministic execution."""
     os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+    torch.default_generator.manual_seed(seed)
+    if use_cuda and torch.cuda.is_available():
+        try:
+            torch.cuda.manual_seed(seed)
+            torch.cuda.manual_seed_all(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+        except Exception:
+            pass
 
 
 # ============================================================
