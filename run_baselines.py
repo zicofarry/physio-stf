@@ -18,6 +18,7 @@ import sys
 import gc
 import json
 import pickle
+import random
 import argparse
 import numpy as np
 
@@ -29,10 +30,14 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR, SVC
 from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression, Ridge
-from sklearn.metrics import roc_auc_score, accuracy_score, f1_score, recall_score, precision_score, mean_squared_error, mean_absolute_error
+from sklearn.metrics import (
+    roc_auc_score, average_precision_score, accuracy_score,
+    f1_score, recall_score, precision_score,
+    mean_squared_error, mean_absolute_error
+)
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from test import compute_mard, compute_parkes_error_grid, find_eer_threshold
+from test import compute_mard, compute_parkes_error_grid, find_eer_threshold, seed_everything
 
 
 # ============================================================
@@ -146,7 +151,7 @@ def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_
     y_pred_prob = np.asarray(y_pred_prob, dtype=float)
 
     if fixed_thr is not None and np.isfinite(fixed_thr):
-        thr = float(fixed_thr)
+        thr = float(np.clip(fixed_thr, 0.20, 0.80))
     else:
         thr = find_eer_threshold(y_true_cls, y_pred_prob)
 
@@ -157,22 +162,42 @@ def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_
     except Exception:
         auc = 0.5
 
+    try:
+        auprc = float(average_precision_score(y_true_cls, y_pred_prob)) if len(np.unique(y_true_cls)) > 1 else 0.0
+    except Exception:
+        auprc = 0.0
+
+    sens = float(recall_score(y_true_cls, y_pred_bin, zero_division=0))
+    spec = float(recall_score(1 - y_true_cls, 1 - y_pred_bin, zero_division=0))
+    balanced_acc = 0.5 * (sens + spec)
+
     rmse = float(np.sqrt(mean_squared_error(y_true_reg, y_pred_reg)))
     mae = float(mean_absolute_error(y_true_reg, y_pred_reg))
     mard = compute_mard(y_true_reg, y_pred_reg)
+    try:
+        if len(y_true_reg) > 1 and np.std(y_true_reg) > 1e-8 and np.std(y_pred_reg) > 1e-8:
+            r_val = float(np.corrcoef(y_true_reg, y_pred_reg)[0, 1])
+            pearson_r = r_val if np.isfinite(r_val) else 0.0
+        else:
+            pearson_r = 0.0
+    except Exception:
+        pearson_r = 0.0
     parkes = compute_parkes_error_grid(y_true_reg, y_pred_reg)
 
     return {
         'auc': auc,
+        'auprc': auprc,
         'acc': float(accuracy_score(y_true_cls, y_pred_bin)),
-        'sensitivity': float(recall_score(y_true_cls, y_pred_bin, zero_division=0)),
-        'specificity': float(recall_score(1 - y_true_cls, 1 - y_pred_bin, zero_division=0)),
+        'balanced_acc': balanced_acc,
+        'sensitivity': sens,
+        'specificity': spec,
         'precision': float(precision_score(y_true_cls, y_pred_bin, zero_division=0)),
         'f1': float(f1_score(y_true_cls, y_pred_bin, zero_division=0)),
         'eer_threshold': thr,
         'rmse': rmse,
         'mae': mae,
         'mard': mard,
+        'pearson_r': pearson_r,
         'parkes_zone_a': parkes['A'],
         'parkes_zone_b': parkes['B'],
         'parkes_ab': parkes['AB'],
@@ -183,6 +208,7 @@ def run_tabular_baseline(model_type, folds, X_matrix, y_reg_all, y_cls_all):
     """Run SVM or Random Forest across 5 folds."""
     results = {}
     for fold_name, fold_info in folds.items():
+        seed_everything(42)
         tr_idx = fold_info['train']
         va_idx = fold_info['val']
 
@@ -243,6 +269,7 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
 
     results = {}
     for fold_name, fold_info in folds.items():
+        seed_everything(42)
         tr_idx = fold_info['train']
         va_idx = fold_info['val']
 
@@ -252,7 +279,10 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
         tr_ds = QuamerDataset(tr_segs)
         va_ds = QuamerDataset(va_segs)
 
-        tr_loader = DataLoader(tr_ds, batch_size=32, shuffle=True)
+        g = torch.Generator()
+        g.manual_seed(42)
+        tr_loader = DataLoader(tr_ds, batch_size=32, shuffle=True, generator=g)
+        tr_eval_loader = DataLoader(tr_ds, batch_size=64, shuffle=False)
         va_loader = DataLoader(va_ds, batch_size=64, shuffle=False)
 
         model = QuamerFullLateFusion().to(device)
@@ -307,8 +337,19 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
         if best_state is not None:
             model.load_state_dict(best_state)
 
-        # Final predictions on validation set
+        # Calibrate classification threshold on training fold
         model.eval()
+        tr_preds_prob = []
+        with torch.no_grad():
+            for b in tr_eval_loader:
+                ecg = b['ecg'].to(device)
+                ppg = b['ppg'].to(device)
+                eda = b['eda'].to(device)
+                c_pred, _ = model(ecg, ppg, eda)
+                tr_preds_prob.extend(torch.sigmoid(c_pred).reshape(-1).cpu().numpy().tolist())
+        tr_thr = find_eer_threshold(tr_ds.labels, tr_preds_prob)
+
+        # Final predictions on validation set
         va_preds_reg, va_preds_prob = [], []
         with torch.no_grad():
             for b in va_loader:
@@ -320,7 +361,7 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
                 r_mgdl = r_pred * g_std + g_mean
                 va_preds_reg.extend(r_mgdl.reshape(-1).cpu().numpy().tolist())
 
-        metrics = evaluate_predictions(va_ds.glucose, va_preds_reg, va_ds.labels, va_preds_prob)
+        metrics = evaluate_predictions(va_ds.glucose, va_preds_reg, va_ds.labels, va_preds_prob, fixed_thr=tr_thr)
         results[fold_name] = metrics
         del model, opt
         if torch.cuda.is_available():
@@ -331,7 +372,10 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
 
 
 def summarize_results(res_dict):
-    keys = ['auc', 'acc', 'f1', 'sensitivity', 'specificity', 'rmse', 'mae', 'mard', 'parkes_ab']
+    keys = [
+        'auc', 'auprc', 'acc', 'balanced_acc', 'f1',
+        'sensitivity', 'specificity', 'rmse', 'mae', 'mard', 'pearson_r', 'parkes_ab'
+    ]
     summary = {}
     for k in keys:
         vals = [v[k] for v in res_dict.values() if k in v]
@@ -344,6 +388,7 @@ def summarize_results(res_dict):
 # ============================================================
 
 def main():
+    seed_everything(42)
     parser = argparse.ArgumentParser(description='ST-MGM: Run Baselines for Table 7')
     parser.add_argument('-s', '--subject', type=str, required=True, help='Subject ID')
     parser.add_argument('--data_dir', type=str, default='./data')
@@ -386,11 +431,14 @@ def main():
 
         summ = summarize_results(res)
         print(f"  Results for {m.upper()}:")
-        print(f"    AUC:       {summ['auc']['mean']:.4f} ± {summ['auc']['std']:.4f}")
-        print(f"    F1:        {summ['f1']['mean']:.4f} ± {summ['f1']['std']:.4f}")
-        print(f"    RMSE:      {summ['rmse']['mean']:.2f} ± {summ['rmse']['std']:.2f} mg/dL")
-        print(f"    MARD:      {summ['mard']['mean']:.2f} ± {summ['mard']['std']:.2f}%")
-        print(f"    Parkes AB: {summ['parkes_ab']['mean']:.2f} ± {summ['parkes_ab']['std']:.2f}%")
+        print(f"    AUC:        {summ['auc']['mean']:.4f} ± {summ['auc']['std']:.4f}")
+        print(f"    AUPRC:      {summ['auprc']['mean']:.4f} ± {summ['auprc']['std']:.4f}")
+        print(f"    F1:         {summ['f1']['mean']:.4f} ± {summ['f1']['std']:.4f}")
+        print(f"    BalAcc:     {summ['balanced_acc']['mean']:.4f} ± {summ['balanced_acc']['std']:.4f}")
+        print(f"    RMSE:       {summ['rmse']['mean']:.2f} ± {summ['rmse']['std']:.2f} mg/dL")
+        print(f"    MARD:       {summ['mard']['mean']:.2f} ± {summ['mard']['std']:.2f}%")
+        print(f"    Pearson r:  {summ['pearson_r']['mean']:.4f} ± {summ['pearson_r']['std']:.4f}")
+        print(f"    Parkes AB:  {summ['parkes_ab']['mean']:.2f} ± {summ['parkes_ab']['std']:.2f}%")
 
         out_file = os.path.join(out_folder, 'evaluation_results.json')
         with open(out_file, 'w') as f:

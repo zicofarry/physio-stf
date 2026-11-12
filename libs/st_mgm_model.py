@@ -46,6 +46,9 @@ class STMGMModel(nn.Module):
         - M7: No Temporal (ResNet Morph + EDA BiLSTM)
         - M8: No ResNet (Temporal DWT + EDA BiLSTM)
         - M9: Full ST-MGM (Temporal + Morphological + EDA)
+        - M9_CLS / SINGLE_CLS: Full branches, single-task classification
+        - M9_REG / SINGLE_REG: Full branches, single-task regression
+        - M9_NOCOUPLE / NO_COUPLE: Full branches, multi-task without logit coupling
     """
 
     def __init__(self,
@@ -56,7 +59,8 @@ class STMGMModel(nn.Module):
                  shared_dropout_1=0.3,
                  shared_hidden_2=32,
                  shared_dropout_2=0.2,
-                 variant='M9'):
+                 variant='M9',
+                 enable_coupling=True):
         super().__init__()
 
         self.temporal_dim = temporal_dim
@@ -64,10 +68,18 @@ class STMGMModel(nn.Module):
         self.eda_output_dim = eda_output_dim
         self.variant = variant.upper()
 
+        full_branch_variants = [
+            'M9', 'M9_CLS', 'SINGLE_CLS', 'M9_REG', 'SINGLE_REG', 'M9_NOCOUPLE', 'NO_COUPLE'
+        ]
+        no_couple_variants = [
+            'M9_CLS', 'SINGLE_CLS', 'M9_REG', 'SINGLE_REG', 'M9_NOCOUPLE', 'NO_COUPLE'
+        ]
+        self.enable_coupling = bool(enable_coupling) and (self.variant not in no_couple_variants)
+
         # Determine which branches are active
-        self.use_temporal = self.variant in ['M1', 'M6', 'M8', 'M9']
-        self.use_morph = self.variant in ['M2', 'M6', 'M7', 'M9']
-        self.use_eda = self.variant in ['M3', 'M7', 'M8', 'M9']
+        self.use_temporal = self.variant in ['M1', 'M4', 'M5', 'M6', 'M8'] + full_branch_variants
+        self.use_morph = self.variant in ['M2', 'M4', 'M5', 'M6', 'M7'] + full_branch_variants
+        self.use_eda = self.variant in ['M3', 'M7', 'M8'] + full_branch_variants
 
         fusion_dim = 0
         if self.use_temporal:
@@ -85,6 +97,19 @@ class STMGMModel(nn.Module):
 
         assert fusion_dim > 0, f"Variant {variant} has no active branches!"
         self.fusion_dim = fusion_dim
+
+        # Adaptive Gated Multimodal Fusion with positive bias initialization for stability
+        self.fusion_gate = nn.Sequential(
+            nn.LayerNorm(fusion_dim),
+            nn.Linear(fusion_dim, fusion_dim),
+            nn.Sigmoid(),
+        )
+        nn.init.xavier_uniform_(self.fusion_gate[1].weight, gain=0.5)
+        nn.init.constant_(self.fusion_gate[1].bias, 1.0)
+        if self.use_eda and (self.use_temporal or self.use_morph):
+            eda_start = (temporal_dim if self.use_temporal else 0) + (morph_output_dim if self.use_morph else 0)
+            with torch.no_grad():
+                self.fusion_gate[1].bias[eda_start:].fill_(0.25)
 
         # Shared MLP with LayerNorm and GELU to prevent Dying ReLU
         self.shared_mlp = nn.Sequential(
@@ -117,7 +142,7 @@ class STMGMModel(nn.Module):
 
     def forward(self, f_temporal, ecg_beats, ppg_pulses, eda_signal):
         """
-        Full forward pass through active branches and fusion.
+        Full forward pass through active branches, adaptive gating, and fusion.
         """
         branch_feats = []
 
@@ -136,15 +161,21 @@ class STMGMModel(nn.Module):
         else:
             f_fusion = branch_feats[0]
 
-        shared = self.shared_mlp(f_fusion)
+        gate = self.fusion_gate(f_fusion)
+        f_gated = f_fusion * gate
+
+        shared = self.shared_mlp(f_gated)
         if self.use_temporal:
             shared = shared + self.temporal_skip(f_temp_norm)
 
         reg_value = self.reg_head(shared)
-        cls_logits = (
-            self.cls_head(shared)
-            + F.softplus(self.reg_logit_scale) * (self.reg_threshold - reg_value)
-        )
+        if self.enable_coupling:
+            cls_logits = (
+                self.cls_head(shared)
+                + F.softplus(self.reg_logit_scale) * (self.reg_threshold - reg_value)
+            )
+        else:
+            cls_logits = self.cls_head(shared)
 
         return cls_logits, reg_value
 
@@ -177,6 +208,16 @@ class STMGMFusionOnly(nn.Module):
         self.norm_temporal = nn.LayerNorm(temporal_dim)
         self.norm_morph = nn.LayerNorm(morph_dim)
         self.norm_eda = nn.LayerNorm(eda_dim)
+
+        self.fusion_gate = nn.Sequential(
+            nn.LayerNorm(fusion_dim),
+            nn.Linear(fusion_dim, fusion_dim),
+            nn.Sigmoid(),
+        )
+        nn.init.xavier_uniform_(self.fusion_gate[1].weight, gain=0.5)
+        nn.init.constant_(self.fusion_gate[1].bias, 1.0)
+        with torch.no_grad():
+            self.fusion_gate[1].bias[temporal_dim + morph_dim:].fill_(0.25)
 
         self.shared_mlp = nn.Sequential(
             nn.LayerNorm(fusion_dim),
@@ -217,7 +258,8 @@ class STMGMFusionOnly(nn.Module):
         f_morph_norm = self.norm_morph(f_morph)
         f_eda_norm = self.norm_eda(f_eda)
         f_fusion = torch.cat([f_temp_norm, f_morph_norm, f_eda_norm], dim=1)
-        shared = self.shared_mlp(f_fusion) + self.temporal_skip(f_temp_norm)
+        f_gated = f_fusion * self.fusion_gate(f_fusion)
+        shared = self.shared_mlp(f_gated) + self.temporal_skip(f_temp_norm)
         reg_value = self.reg_head(shared)
         cls_logits = (
             self.cls_head(shared)

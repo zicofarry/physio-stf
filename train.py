@@ -39,11 +39,12 @@ from libs.dwt_features import combined_feature_selection
 
 def find_eer_threshold(targets, probs):
     """
-    Find optimal probability threshold balancing F1-score and Youden's J (TPR - FPR)
-    with finite-value guard.
+    Find calibrated probability threshold balancing F1-score and Youden's J (TPR - FPR)
+    constrained within a prevalence-aware probability quantile range to prevent
+    extreme overconfident training thresholds.
     """
     targets = np.asarray(targets).reshape(-1)
-    probs = np.asarray(probs).reshape(-1)
+    probs = np.asarray(probs, dtype=np.float64).reshape(-1)
     if len(targets) == 0 or len(np.unique(targets)) < 2 or np.allclose(probs, probs[0]):
         return 0.5
     fpr, tpr, thresholds = roc_curve(targets, probs)
@@ -56,31 +57,57 @@ def find_eer_threshold(targets, probs):
 
     n_pos = float(np.sum(targets == 1))
     n_neg = float(np.sum(targets == 0))
+    prevalence = float(np.clip(n_pos / max(n_pos + n_neg, 1.0), 0.02, 0.40))
+
     tp = tpr * n_pos
     fp = fpr * n_neg
     fn = (1.0 - tpr) * n_pos
     f1_scores = (2.0 * tp) / np.maximum(2.0 * tp + fp + fn, 1e-8)
     youden_j = tpr - fpr
-
     combined_score = 0.5 * f1_scores + 0.5 * youden_j
-    best_idx = int(np.nanargmax(combined_score))
-    thr = float(thresholds[best_idx])
-    return float(np.clip(thr, 1e-6, 1.0 - 1e-6))
+
+    q_low = float(np.quantile(probs, np.clip(1.0 - 3.5 * prevalence, 0.50, 0.85)))
+    q_high = float(np.quantile(probs, np.clip(1.0 - 0.8 * prevalence, 0.70, 0.95)))
+    q_prev = float(np.quantile(probs, np.clip(1.0 - 1.25 * prevalence, 0.65, 0.94)))
+
+    low_bound = float(np.clip(min(q_low, q_high), 0.20, 0.75))
+    high_bound = float(np.clip(max(q_low, q_high), max(low_bound + 0.05, 0.30), 0.80))
+
+    valid_mask = (thresholds >= low_bound) & (thresholds <= high_bound)
+    if not np.any(valid_mask):
+        valid_mask = (thresholds >= 0.20) & (thresholds <= 0.80)
+
+    if np.any(valid_mask):
+        valid_indices = np.where(valid_mask)[0]
+        best_local = int(np.nanargmax(combined_score[valid_indices]))
+        thr_opt = float(thresholds[valid_indices[best_local]])
+    else:
+        best_idx = int(np.nanargmax(combined_score))
+        thr_opt = float(np.clip(thresholds[best_idx], 0.20, 0.80))
+
+    q_prev_clipped = float(np.clip(q_prev, 0.20, 0.80))
+    thr = 0.7 * thr_opt + 0.3 * q_prev_clipped
+    return float(np.clip(thr, 0.20, 0.80))
 
 
 # ============================================================
 # Reproducibility
 # ============================================================
 
-def set_seed(seed=42):
-    """Set all random seeds for reproducibility."""
+def seed_everything(seed=42):
+    """Set all random seeds for deterministic execution."""
+    os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+
+set_seed = seed_everything
 
 
 def seed_worker(worker_id):
@@ -222,7 +249,7 @@ def load_config():
     return {}
 
 
-def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', variant='M9'):
+def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', variant='M9', task_mode='multitask'):
     """
     Train ST-MGM or Ablation Variant for a given subject.
 
@@ -231,9 +258,10 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
         data_dir: Path to feature data
         out_dir: Output directory for models
         mode: 'e2e' (end-to-end) or 'fusion_only'
-        variant: Ablation variant ('M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9')
+        variant: Ablation variant ('M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9', 'M9_CLS', 'M9_REG', 'M9_NOCOUPLE')
+        task_mode: 'multitask', 'cls_only', or 'reg_only'
     """
-    set_seed(42)
+    seed_everything(42)
 
     config = load_config()
     training_cfg = config.get('training', {})
@@ -273,7 +301,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
 
     folds = metadata.get('folds', metadata)
     variant_name = variant.upper()
-    save_dir = os.path.join(out_dir, subject) if variant_name == 'M9' else os.path.join(out_dir, f"{subject}_{variant_name.lower()}")
+    save_dir = os.path.join(out_dir, subject) if variant_name == 'M9' and task_mode == 'multitask' else os.path.join(out_dir, f"{subject}_{variant_name.lower()}")
     os.makedirs(save_dir, exist_ok=True)
 
     # Training hyperparameters
@@ -286,7 +314,12 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
     beta = training_cfg.get('loss_beta', 0.5)
     max_grad_norm = float(training_cfg.get('max_grad_norm', 1.0))
 
-    print(f"\nTraining ST-MGM ({mode}, variant={variant_name}) for {subject}")
+    if variant_name in ['M9_CLS', 'SINGLE_CLS'] or task_mode == 'cls_only':
+        alpha, beta = 1.0, 0.0
+    elif variant_name in ['M9_REG', 'SINGLE_REG'] or task_mode == 'reg_only':
+        alpha, beta = 0.0, 1.0
+
+    print(f"\nTraining ST-MGM ({mode}, variant={variant_name}, task_mode={task_mode}) for {subject}")
     print(f"  Target selected features: {n_selected_features}, Folds: {list(folds.keys())}")
     print(f"  LR: {lr}, Batch: {batch_size}, Epochs: {epochs}, Patience: {patience}")
     print(f"  Loss weights: alpha={alpha} (BCEWithLogits), beta={beta} (MSE/Huber), grad_clip={max_grad_norm}")
@@ -298,7 +331,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
         print(f"  Fold {fold_name}")
         print(f"{'='*50}")
 
-        set_seed(42)
+        seed_everything(42)
 
         train_indices = fold_info.get('train', [])
         val_indices = fold_info.get('val', [])
@@ -310,11 +343,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
         train_labels_cls = (train_glucose < hypo_threshold).astype(int)
 
         # 1. Leak-free per-fold feature selection on train_indices only
-        if 'selected_indices' in fold_info and fold_info['selected_indices'] is not None:
-            fold_sel_idx = np.array(fold_info['selected_indices'], dtype=int)
-        elif fold_name in fold_selected_map:
-            fold_sel_idx = np.array(fold_selected_map[fold_name], dtype=int)
-        elif temporal_raw is not None:
+        if temporal_raw is not None:
             try:
                 fold_sel_idx, _ = combined_feature_selection(
                     temporal_raw[train_indices],
@@ -324,7 +353,14 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
                 )
             except Exception as e:
                 print(f"  WARNING: Per-fold feature selection failed ({e}), using fallback indices")
-                fold_sel_idx = np.arange(min(n_selected_features, temporal_raw.shape[1]), dtype=int)
+                if 'selected_indices' in fold_info and fold_info['selected_indices'] is not None:
+                    fold_sel_idx = np.array(fold_info['selected_indices'], dtype=int)
+                else:
+                    fold_sel_idx = np.arange(min(n_selected_features, temporal_raw.shape[1]), dtype=int)
+        elif 'selected_indices' in fold_info and fold_info['selected_indices'] is not None:
+            fold_sel_idx = np.array(fold_info['selected_indices'], dtype=int)
+        elif fold_name in fold_selected_map:
+            fold_sel_idx = np.array(fold_selected_map[fold_name], dtype=int)
         else:
             fold_sel_idx = np.array(selected_indices_fallback, dtype=int)
 
@@ -403,7 +439,8 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
         )
 
         # Create model & criterion with pos_weight, variant support, and threshold coupling
-        model = STMGMModel(temporal_dim=temporal_dim, variant=variant_name)
+        enable_coupling = (alpha > 0.0 and beta > 0.0) and (variant_name not in ['M9_NOCOUPLE', 'NO_COUPLE'])
+        model = STMGMModel(temporal_dim=temporal_dim, variant=variant_name, enable_coupling=enable_coupling)
         model.set_reg_threshold(
             hypo_threshold=hypo_threshold,
             glucose_mean=glucose_mean,
@@ -436,8 +473,13 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
             except Exception:
                 val_auc = 0.5
 
-            # Combined validation criterion: normalized regression loss + (1 - AUC)
-            val_score = float(val_metrics['reg_loss']) + 0.5 * (1.0 - val_auc)
+            if alpha > 0.0 and beta == 0.0:
+                val_score = 1.0 - val_auc
+            elif beta > 0.0 and alpha == 0.0:
+                val_score = float(val_metrics['reg_loss'])
+            else:
+                # Combined validation criterion: normalized regression loss + (1 - AUC)
+                val_score = float(val_metrics['reg_loss']) + 0.5 * (1.0 - val_auc)
 
             if val_score < best_val_score:
                 best_val_score = val_score
@@ -520,14 +562,22 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
 # ============================================================
 
 if __name__ == '__main__':
+    VALID_VARIANTS = [
+        'M1', 'M2', 'M3', 'M4', 'M5', 'M6', 'M7', 'M8', 'M9',
+        'M9_CLS', 'M9_REG', 'M9_NOCOUPLE', 'SINGLE_CLS', 'SINGLE_REG', 'NO_COUPLE',
+        'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9',
+        'm9_cls', 'm9_reg', 'm9_nocouple', 'single_cls', 'single_reg', 'no_couple',
+    ]
     parser = argparse.ArgumentParser(description='ST-MGM: Multi-Task Training')
     parser.add_argument('-s', '--subject', type=str, required=True, help='Subject ID')
     parser.add_argument('--data_dir', type=str, default='./data', help='Data directory')
     parser.add_argument('--out_dir', type=str, default='./results', help='Output directory')
     parser.add_argument('--mode', type=str, default='e2e', choices=['e2e', 'fusion_only'])
-    parser.add_argument('--variant', type=str, default='M9',
-                        choices=['M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9', 'm1', 'm2', 'm3', 'm6', 'm7', 'm8', 'm9'],
-                        help='Ablation variant (M1: DWT only, M2: ResNet only, M3: EDA only, M6: No EDA, M7: No DWT, M8: No ResNet, M9: Full)')
+    parser.add_argument('--variant', type=str, default='M9', choices=VALID_VARIANTS,
+                        help='Ablation variant (M1..M9, M9_CLS, M9_REG, M9_NOCOUPLE)')
+    parser.add_argument('--task_mode', type=str, default='multitask',
+                        choices=['multitask', 'cls_only', 'reg_only'],
+                        help='Training objective mode')
     args = parser.parse_args()
 
-    train_subject(args.subject, args.data_dir, args.out_dir, args.mode, args.variant)
+    train_subject(args.subject, args.data_dir, args.out_dir, args.mode, args.variant, args.task_mode)

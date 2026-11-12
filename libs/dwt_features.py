@@ -206,24 +206,81 @@ def extract_temporal_features(ecg_signal, ppg_signal, fs_ecg=250, fs_ppg=64,
 # Feature Selection: UFS + L1-FS + RFE → ~18 features
 # ============================================================
 
-def select_features_ufs(features_matrix, n_keep=80):
+def select_features_ufs(features_matrix, n_keep=80, labels_reg=None, labels_cls=None):
     """
-    Unsupervised Feature Selection based on variance.
-    Removes features with near-zero variance.
+    Scale-invariant Unsupervised / Mutual-Relevance Feature Selection.
+    Filters near-constant features (std > 1e-6), standardizes features via StandardScaler,
+    and ranks features by correlation relevance and low inter-feature redundancy.
 
     Args:
         features_matrix: (N_samples, 160) array
         n_keep: Max features to keep
+        labels_reg: Optional (N_samples,) continuous target for mutual relevance
+        labels_cls: Optional (N_samples,) binary target for mutual relevance
 
     Returns:
         selected_indices: indices of selected features
     """
-    variances = np.var(features_matrix, axis=0)
-    sorted_indices = np.argsort(-variances)
-    return sorted_indices[:n_keep]
+    from sklearn.preprocessing import StandardScaler
+
+    X = np.nan_to_num(
+        np.asarray(features_matrix, dtype=np.float64),
+        nan=0.0, posinf=0.0, neginf=0.0,
+    )
+    n_samples, n_features = X.shape
+    n_keep = min(int(n_keep), n_features)
+
+    stds = np.std(X, axis=0)
+    valid_indices = np.where(stds > 1e-6)[0]
+    if len(valid_indices) == 0:
+        return np.arange(n_keep, dtype=int)
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X[:, valid_indices])
+
+    if len(valid_indices) > 1 and n_samples > 1:
+        corr_mat = np.abs(np.corrcoef(X_scaled, rowvar=False))
+        corr_mat = np.nan_to_num(corr_mat, nan=0.0, posinf=0.0, neginf=0.0)
+        np.fill_diagonal(corr_mat, 0.0)
+        redundancy = np.mean(corr_mat, axis=1)
+    else:
+        redundancy = np.zeros(len(valid_indices), dtype=np.float64)
+
+    rel_terms = []
+    if labels_reg is not None and n_samples > 1:
+        y_reg = np.asarray(labels_reg, dtype=np.float64).reshape(-1)
+        y_reg_std = np.std(y_reg)
+        if y_reg_std > 1e-8:
+            y_reg_norm = (y_reg - np.mean(y_reg)) / y_reg_std
+            corr_reg = np.abs(np.dot(X_scaled.T, y_reg_norm) / float(n_samples))
+            rel_terms.append(np.nan_to_num(corr_reg, nan=0.0))
+
+    if labels_cls is not None and n_samples > 1:
+        y_cls = np.asarray(labels_cls, dtype=np.float64).reshape(-1)
+        y_cls_std = np.std(y_cls)
+        if y_cls_std > 1e-8:
+            y_cls_norm = (y_cls - np.mean(y_cls)) / y_cls_std
+            corr_cls = np.abs(np.dot(X_scaled.T, y_cls_norm) / float(n_samples))
+            rel_terms.append(np.nan_to_num(corr_cls, nan=0.0))
+
+    if rel_terms:
+        relevance = np.mean(rel_terms, axis=0)
+    else:
+        # Scale-invariant dispersion on standardized features when no targets are passed
+        relevance = np.mean(np.abs(X_scaled - np.median(X_scaled, axis=0)), axis=0)
+
+    ufs_scores = (relevance + 1e-4) / (redundancy + 0.15)
+    ranked_valid = valid_indices[np.argsort(-ufs_scores)]
+
+    if len(ranked_valid) >= n_keep:
+        return ranked_valid[:n_keep]
+
+    remaining = np.setdiff1d(np.arange(n_features, dtype=int), ranked_valid)
+    n_pad = n_keep - len(ranked_valid)
+    return np.concatenate([ranked_valid, remaining[:n_pad]])
 
 
-def select_features_l1(features_matrix, labels, alpha=0.01):
+def select_features_l1(features_matrix, labels, alpha=0.01, return_scores=False):
     """
     L1-based Feature Selection using Lasso on standardized features and targets.
 
@@ -231,15 +288,20 @@ def select_features_l1(features_matrix, labels, alpha=0.01):
         features_matrix: (N_samples, N_features) array
         labels: (N_samples,) regression targets (glucose values)
         alpha: L1 regularization strength
+        return_scores: Whether to also return normalized |Lasso coef| scores
 
     Returns:
-        selected_indices: indices of features with non-zero coefficients
+        selected_indices (and optionally norm_scores)
     """
     from sklearn.linear_model import Lasso
     from sklearn.preprocessing import StandardScaler
 
+    X = np.nan_to_num(
+        np.asarray(features_matrix, dtype=np.float64),
+        nan=0.0, posinf=0.0, neginf=0.0,
+    )
     scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(features_matrix)
+    X_scaled = scaler.fit_transform(X)
 
     y_arr = np.asarray(labels, dtype=np.float64)
     y_std = np.std(y_arr)
@@ -252,41 +314,69 @@ def select_features_l1(features_matrix, labels, alpha=0.01):
     lasso = Lasso(alpha=eff_alpha, max_iter=10000, tol=1e-3, random_state=42)
     lasso.fit(X_scaled, y_scaled)
 
-    # Select features with non-zero coefficients
-    selected = np.where(np.abs(lasso.coef_) > 1e-5)[0]
-    if len(selected) == 0:
-        # Fallback: select top features by absolute coefficient
-        selected = np.argsort(-np.abs(lasso.coef_))[:20]
+    coef_abs = np.abs(lasso.coef_)
+    max_coef = float(np.max(coef_abs)) if len(coef_abs) > 0 else 0.0
+    norm_scores = coef_abs / max_coef if max_coef > 1e-12 else np.zeros_like(coef_abs)
 
+    selected = np.where(coef_abs > 1e-5)[0]
+    if len(selected) == 0:
+        selected = np.argsort(-coef_abs)[:min(20, len(coef_abs))]
+
+    if return_scores:
+        return selected, norm_scores
     return selected
 
 
-def select_features_rfe(features_matrix, labels, n_features=18):
+def select_features_rfe(features_matrix, labels, n_features=18, return_scores=False):
     """
-    Recursive Feature Elimination.
+    Recursive Feature Elimination on standardized features.
 
     Args:
         features_matrix: (N_samples, N_features) array
         labels: (N_samples,) binary labels
         n_features: Target number of features
+        return_scores: Whether to also return normalized RF feature_importances_
 
     Returns:
-        selected_indices: indices of selected features
+        selected_indices (and optionally norm_scores)
     """
     from sklearn.ensemble import RandomForestClassifier
     from sklearn.feature_selection import RFE
+    from sklearn.preprocessing import StandardScaler
 
-    clf = RandomForestClassifier(n_estimators=50, random_state=42, n_jobs=-1)
-    rfe = RFE(clf, n_features_to_select=n_features, step=5)
-    rfe.fit(features_matrix, labels)
+    X = np.nan_to_num(
+        np.asarray(features_matrix, dtype=np.float64),
+        nan=0.0, posinf=0.0, neginf=0.0,
+    )
+    X_scaled = StandardScaler().fit_transform(X)
 
-    return np.where(rfe.support_)[0]
+    clf = RandomForestClassifier(
+        n_estimators=50, class_weight='balanced', random_state=42, n_jobs=-1
+    )
+    clf.fit(X_scaled, labels)
+    rf_importances = np.asarray(clf.feature_importances_, dtype=np.float64)
+    max_imp = float(np.max(rf_importances)) if len(rf_importances) > 0 else 0.0
+    norm_scores = rf_importances / max_imp if max_imp > 1e-12 else np.zeros_like(rf_importances)
+
+    rfe_est = RandomForestClassifier(
+        n_estimators=50, class_weight='balanced', random_state=42, n_jobs=-1
+    )
+    rfe = RFE(rfe_est, n_features_to_select=min(int(n_features), X_scaled.shape[1]), step=5)
+    rfe.fit(X_scaled, labels)
+
+    selected = np.where(rfe.support_)[0]
+    if return_scores:
+        return selected, norm_scores
+    return selected
 
 
 def combined_feature_selection(features_matrix, labels_cls, labels_reg,
                                 n_final=18, alpha=0.01):
     """
-    Combined feature selection: UFS + L1-FS + RFE → intersection/union → ~18 features.
+    Combined scale-invariant feature selection:
+    UFS (std > 1e-6 filter + StandardScaler + mutual relevance)
+    + L1-FS (Lasso) + RFE (Random Forest), ranking L1 U RFE top-18 via
+    normalized |Lasso coef| + normalized RF feature_importances_.
 
     Args:
         features_matrix: (N_samples, 160) raw temporal features
@@ -300,48 +390,66 @@ def combined_feature_selection(features_matrix, labels_cls, labels_reg,
         feature_importances: dict with selection method results
     """
     n_samples, n_features = features_matrix.shape
+    n_final = min(int(n_final), n_features)
 
-    # Step 1: UFS — variance-based pre-filter
-    ufs_indices = select_features_ufs(features_matrix, n_keep=min(80, n_features))
+    # Step 1: Scale-invariant UFS pre-filter
+    ufs_indices = select_features_ufs(
+        features_matrix,
+        n_keep=min(80, n_features),
+        labels_reg=labels_reg,
+        labels_cls=labels_cls,
+    )
     X_ufs = features_matrix[:, ufs_indices]
+    n_ufs = len(ufs_indices)
 
     # Step 2: L1-FS on UFS-filtered features
     try:
-        l1_local = select_features_l1(X_ufs, labels_reg, alpha=alpha)
+        l1_local, l1_norm_scores = select_features_l1(
+            X_ufs, labels_reg, alpha=alpha, return_scores=True
+        )
         l1_indices = ufs_indices[l1_local]
     except Exception:
-        l1_indices = ufs_indices[:n_final]
+        l1_local = np.arange(min(n_final, n_ufs), dtype=int)
+        l1_norm_scores = np.zeros(n_ufs, dtype=np.float64)
+        l1_indices = ufs_indices[l1_local]
 
     # Step 3: RFE on UFS-filtered features
     try:
-        rfe_local = select_features_rfe(X_ufs, labels_cls, n_features=min(n_final, len(ufs_indices)))
+        rfe_local, rf_norm_scores = select_features_rfe(
+            X_ufs, labels_cls, n_features=min(n_final, n_ufs), return_scores=True
+        )
         rfe_indices = ufs_indices[rfe_local]
     except Exception:
-        rfe_indices = ufs_indices[:n_final]
+        rfe_local = np.arange(min(n_final, n_ufs), dtype=int)
+        rf_norm_scores = np.zeros(n_ufs, dtype=np.float64)
+        rfe_indices = ufs_indices[rfe_local]
 
-    # Combine: union of L1 and RFE, then trim to n_final
-    combined = np.union1d(l1_indices, rfe_indices)
+    # Normalized combined importance score across X_ufs
+    combined_importance_ufs = l1_norm_scores + rf_norm_scores
 
-    if len(combined) > n_final:
-        # Use variance ranking to pick top n_final from combined
-        variances = np.var(features_matrix[:, combined], axis=0)
-        top_k = np.argsort(-variances)[:n_final]
-        final_indices = combined[top_k]
-    elif len(combined) < n_final:
-        # Pad with remaining UFS features
-        remaining = np.setdiff1d(ufs_indices, combined)
-        n_pad = n_final - len(combined)
-        final_indices = np.concatenate([combined, remaining[:n_pad]])
+    # Combine: union of L1 and RFE in local UFS coordinates, then rank by combined importance
+    combined_local = np.union1d(l1_local, rfe_local)
+
+    if len(combined_local) > n_final:
+        candidate_scores = combined_importance_ufs[combined_local]
+        top_k = np.argsort(-candidate_scores)[:n_final]
+        final_local = combined_local[top_k]
+    elif len(combined_local) < n_final:
+        remaining_local = np.setdiff1d(np.arange(n_ufs, dtype=int), combined_local)
+        rem_scores = combined_importance_ufs[remaining_local]
+        rem_ranked = remaining_local[np.argsort(-rem_scores)]
+        n_pad = n_final - len(combined_local)
+        final_local = np.concatenate([combined_local, rem_ranked[:n_pad]])
     else:
-        final_indices = combined
+        final_local = combined_local
 
-    final_indices = np.sort(final_indices).astype(int)
+    final_indices = np.sort(ufs_indices[final_local]).astype(int)
 
     return final_indices, {
         'ufs': ufs_indices,
         'l1': l1_indices,
         'rfe': rfe_indices,
-        'final': final_indices
+        'final': final_indices,
     }
 
 

@@ -207,6 +207,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_folds', default=5, type=int, help='Number of CV folds')
     parser.add_argument('--hypo_threshold', default=70, type=float, help='Hypo threshold mg/dL')
     args = parser.parse_args()
+    np.random.seed(42)
 
     subject_id = args.subject
     processed_dir = os.path.join(args.processed_dir, subject_id)

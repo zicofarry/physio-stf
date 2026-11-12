@@ -62,18 +62,21 @@ def main():
                         help="Ablation variants to run")
     parser.add_argument('--cooldown_sec', type=int, default=30,
                         help="Cooldown seconds between heavy runs")
+    parser.add_argument('--reextract', action='store_true',
+                        help="Run preprocess_features.py for target subjects before training")
     args = parser.parse_args()
 
     subjects = ALL_SUBJECTS if 'all' in args.subjects else args.subjects
 
     print("========================================================")
     print("  ST-MGM Experiment Runner")
-    print(f"  Mode:     {args.mode}")
-    print(f"  Subjects: {subjects}")
+    print(f"  Mode:      {args.mode}")
+    print(f"  Subjects:  {subjects}")
+    print(f"  Reextract: {args.reextract}")
     print("========================================================")
 
     # 1. Preprocess raw data if requested
-    if args.mode in ['preprocess_all', 'full']:
+    if args.reextract or args.mode in ['preprocess_all', 'full']:
         for sub in subjects:
             run_command([sys.executable, 'preprocess_features.py', '--subject', sub],
                         desc=f"Feature extraction for {sub}")
