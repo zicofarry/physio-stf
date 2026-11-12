@@ -301,8 +301,8 @@ def run_tabular_baseline(model_type, folds, X_matrix, y_reg_all, y_cls_all):
     return results
 
 
-def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
-    """Train and evaluate Quamer et al. [23] late fusion baseline."""
+def run_quamer_baseline(folds, segments, device, epochs=30, lr=0.0005, batch_size=16):
+    """Train and evaluate Quamer et al. [23] late fusion baseline with robust GPU memory guard."""
     class QuamerDataset(Dataset):
         def __init__(self, segs, hypo_thr=70.0):
             self.segs = segs
@@ -327,6 +327,9 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
     results = {}
     for fold_name, fold_info in folds.items():
         seed_everything(42)
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         tr_idx = fold_info['train']
         va_idx = fold_info['val']
 
@@ -338,9 +341,9 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
 
         g = torch.Generator()
         g.manual_seed(42)
-        tr_loader = DataLoader(tr_ds, batch_size=32, shuffle=True, generator=g)
-        tr_eval_loader = DataLoader(tr_ds, batch_size=64, shuffle=False)
-        va_loader = DataLoader(va_ds, batch_size=64, shuffle=False)
+        tr_loader = DataLoader(tr_ds, batch_size=batch_size, shuffle=True, generator=g, pin_memory=False)
+        tr_eval_loader = DataLoader(tr_ds, batch_size=batch_size * 2, shuffle=False, pin_memory=False)
+        va_loader = DataLoader(va_ds, batch_size=batch_size * 2, shuffle=False, pin_memory=False)
 
         model = QuamerFullLateFusion().to(device)
         opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
@@ -359,34 +362,36 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
         for ep in range(1, epochs + 1):
             model.train()
             for b in tr_loader:
-                ecg = b['ecg'].to(device)
-                ppg = b['ppg'].to(device)
-                eda = b['eda'].to(device)
-                lbl = b['label'].to(device).unsqueeze(1)
-                glu = ((b['glucose'].to(device) - g_mean) / g_std).unsqueeze(1)
+                ecg = b['ecg'].to(device, non_blocking=True)
+                ppg = b['ppg'].to(device, non_blocking=True)
+                eda = b['eda'].to(device, non_blocking=True)
+                lbl = b['label'].to(device, non_blocking=True).unsqueeze(1)
+                glu = ((b['glucose'].to(device, non_blocking=True) - g_mean) / g_std).unsqueeze(1)
 
                 opt.zero_grad()
                 c_pred, r_pred = model(ecg, ppg, eda)
                 loss = 0.5 * bce(c_pred, lbl) + 0.5 * mse(r_pred, glu)
                 loss.backward()
+                nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
                 opt.step()
 
-            # Simple eval
+            # Validation step
             model.eval()
             val_loss = 0.0
             n_val = 0
             with torch.no_grad():
                 for b in va_loader:
-                    ecg = b['ecg'].to(device)
-                    ppg = b['ppg'].to(device)
-                    eda = b['eda'].to(device)
-                    lbl = b['label'].to(device).unsqueeze(1)
-                    glu = ((b['glucose'].to(device) - g_mean) / g_std).unsqueeze(1)
+                    ecg = b['ecg'].to(device, non_blocking=True)
+                    ppg = b['ppg'].to(device, non_blocking=True)
+                    eda = b['eda'].to(device, non_blocking=True)
+                    lbl = b['label'].to(device, non_blocking=True).unsqueeze(1)
+                    glu = ((b['glucose'].to(device, non_blocking=True) - g_mean) / g_std).unsqueeze(1)
                     c_pred, r_pred = model(ecg, ppg, eda)
                     l = 0.5 * bce(c_pred, lbl) + 0.5 * mse(r_pred, glu)
                     val_loss += l.item() * len(lbl)
                     n_val += len(lbl)
-            val_loss /= n_val
+            val_loss /= max(n_val, 1)
+
             if val_loss < best_score:
                 best_score = val_loss
                 best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
@@ -399,9 +404,9 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
         tr_preds_prob = []
         with torch.no_grad():
             for b in tr_eval_loader:
-                ecg = b['ecg'].to(device)
-                ppg = b['ppg'].to(device)
-                eda = b['eda'].to(device)
+                ecg = b['ecg'].to(device, non_blocking=True)
+                ppg = b['ppg'].to(device, non_blocking=True)
+                eda = b['eda'].to(device, non_blocking=True)
                 c_pred, _ = model(ecg, ppg, eda)
                 tr_preds_prob.extend(torch.sigmoid(c_pred).reshape(-1).cpu().numpy().tolist())
         tr_thr = find_eer_threshold(tr_ds.labels, tr_preds_prob)
@@ -410,9 +415,9 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
         va_preds_reg, va_preds_prob = [], []
         with torch.no_grad():
             for b in va_loader:
-                ecg = b['ecg'].to(device)
-                ppg = b['ppg'].to(device)
-                eda = b['eda'].to(device)
+                ecg = b['ecg'].to(device, non_blocking=True)
+                ppg = b['ppg'].to(device, non_blocking=True)
+                eda = b['eda'].to(device, non_blocking=True)
                 c_pred, r_pred = model(ecg, ppg, eda)
                 va_preds_prob.extend(torch.sigmoid(c_pred).reshape(-1).cpu().numpy().tolist())
                 r_mgdl = r_pred * g_std + g_mean
@@ -423,7 +428,7 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
             fixed_thr=tr_thr, train_glucose_mean=g_mean, train_glucose_std=g_std,
         )
         results[fold_name] = metrics
-        del model, opt
+        del model, opt, tr_ds, va_ds, tr_loader, va_loader, tr_eval_loader
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         gc.collect()
