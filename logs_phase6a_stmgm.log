@@ -1,0 +1,1411 @@
+nohup: ignoring input
+========================================================
+  ST-MGM Experiment Runner
+  Mode:      stmgm
+  Subjects:  ['c1s01_raw', 'c1s02_raw', 'c1s03_raw', 'c1s04_raw', 'c1s05_raw', 'c2s01_raw', 'c2s02_raw', 'c2s03_raw', 'c2s04_raw', 'c2s05_raw']
+  Reextract: False
+========================================================
+
+>>> [2026-11-12 01:13:13] Training ST-MGM (M9) for c1s01_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c1s01_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c1s01_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=114.56, std=37.47 mg/dL | pos_weight=3.82 (raw_ratio=14.6)
+  STMGMDataset: 1621 samples (hypo=104, normal=1517, ratio=14.6)
+  STMGMDataset: 406 samples (hypo=26, normal=380, ratio=14.6)
+  Epoch   1/100: train_loss=0.7266 (cls=0.7006, reg=0.7526) | val_loss=0.5879 (reg=0.5721, auc=0.5929)
+  Epoch  10/100: train_loss=0.4646 (cls=0.4649, reg=0.4643) | val_loss=0.6308 (reg=0.6115, auc=0.6038)
+  Epoch  20/100: train_loss=0.2982 (cls=0.2644, reg=0.3321) | val_loss=0.6632 (reg=0.6569, auc=0.7095)
+  Epoch  30/100: train_loss=0.1524 (cls=0.0848, reg=0.2199) | val_loss=0.8161 (reg=0.6100, auc=0.6926)
+  Epoch  40/100: train_loss=0.0871 (cls=0.0312, reg=0.1431) | val_loss=0.7113 (reg=0.5526, auc=0.7216)
+  Epoch  50/100: train_loss=0.0618 (cls=0.0323, reg=0.0913) | val_loss=0.8257 (reg=0.4843, auc=0.7104)
+  Epoch  60/100: train_loss=0.0356 (cls=0.0094, reg=0.0617) | val_loss=0.8726 (reg=0.5390, auc=0.6800)
+  Early stopping at epoch 65
+  Saved best model → ./results/c1s01_raw/v1.pt (val_score=0.5871, val_loss=0.7189, train_thr=0.2487)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=113.55, std=37.31 mg/dL | pos_weight=3.82 (raw_ratio=14.6)
+  STMGMDataset: 1621 samples (hypo=104, normal=1517, ratio=14.6)
+  STMGMDataset: 406 samples (hypo=26, normal=380, ratio=14.6)
+  Epoch   1/100: train_loss=0.7121 (cls=0.6824, reg=0.7418) | val_loss=0.5854 (reg=0.5787, auc=0.6035)
+  Epoch  10/100: train_loss=0.4750 (cls=0.4479, reg=0.5020) | val_loss=0.5805 (reg=0.5191, auc=0.6084)
+  Epoch  20/100: train_loss=0.3055 (cls=0.2646, reg=0.3464) | val_loss=0.6610 (reg=0.5563, auc=0.6922)
+  Epoch  30/100: train_loss=0.1715 (cls=0.1150, reg=0.2280) | val_loss=0.6663 (reg=0.4592, auc=0.6636)
+  Epoch  40/100: train_loss=0.1002 (cls=0.0431, reg=0.1573) | val_loss=0.7925 (reg=0.4794, auc=0.6423)
+  Epoch  50/100: train_loss=0.0632 (cls=0.0261, reg=0.1003) | val_loss=0.8412 (reg=0.4155, auc=0.6768)
+  Early stopping at epoch 58
+  Saved best model → ./results/c1s01_raw/v2.pt (val_score=0.5633, val_loss=0.7561, train_thr=0.6042)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=112.89, std=35.99 mg/dL | pos_weight=3.82 (raw_ratio=14.6)
+  STMGMDataset: 1622 samples (hypo=104, normal=1518, ratio=14.6)
+  STMGMDataset: 405 samples (hypo=26, normal=379, ratio=14.6)
+  Epoch   1/100: train_loss=0.7270 (cls=0.6781, reg=0.7759) | val_loss=0.7103 (reg=0.7983, auc=0.5188)
+  Epoch  10/100: train_loss=0.4782 (cls=0.4469, reg=0.5095) | val_loss=0.6401 (reg=0.7274, auc=0.7424)
+  Epoch  20/100: train_loss=0.2983 (cls=0.2176, reg=0.3790) | val_loss=0.7063 (reg=0.7431, auc=0.7351)
+  Epoch  30/100: train_loss=0.1852 (cls=0.1288, reg=0.2415) | val_loss=0.7339 (reg=0.6291, auc=0.7524)
+  Epoch  40/100: train_loss=0.1153 (cls=0.0661, reg=0.1646) | val_loss=0.6846 (reg=0.6745, auc=0.8284)
+  Epoch  50/100: train_loss=0.0631 (cls=0.0119, reg=0.1144) | val_loss=0.7434 (reg=0.6173, auc=0.8030)
+  Epoch  60/100: train_loss=0.0478 (cls=0.0090, reg=0.0867) | val_loss=0.8039 (reg=0.6105, auc=0.7879)
+  Epoch  70/100: train_loss=0.0304 (cls=0.0056, reg=0.0553) | val_loss=0.8442 (reg=0.5946, auc=0.7850)
+  Epoch  80/100: train_loss=0.0292 (cls=0.0058, reg=0.0526) | val_loss=0.8486 (reg=0.5635, auc=0.7863)
+  Epoch  90/100: train_loss=0.0262 (cls=0.0059, reg=0.0465) | val_loss=0.8139 (reg=0.5793, auc=0.7987)
+  Epoch 100/100: train_loss=0.0230 (cls=0.0051, reg=0.0408) | val_loss=0.8390 (reg=0.5761, auc=0.7922)
+  Saved best model → ./results/c1s01_raw/v3.pt (val_score=0.6634, val_loss=0.8485, train_thr=0.6200)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=113.48, std=36.76 mg/dL | pos_weight=3.82 (raw_ratio=14.6)
+  STMGMDataset: 1622 samples (hypo=104, normal=1518, ratio=14.6)
+  STMGMDataset: 405 samples (hypo=26, normal=379, ratio=14.6)
+  Epoch   1/100: train_loss=0.7137 (cls=0.6778, reg=0.7495) | val_loss=0.6248 (reg=0.6437, auc=0.5932)
+  Epoch  10/100: train_loss=0.4913 (cls=0.4609, reg=0.5218) | val_loss=0.5898 (reg=0.5792, auc=0.6906)
+  Epoch  20/100: train_loss=0.3231 (cls=0.2483, reg=0.3978) | val_loss=0.5504 (reg=0.5144, auc=0.7403)
+  Epoch  30/100: train_loss=0.1843 (cls=0.0856, reg=0.2831) | val_loss=0.6832 (reg=0.5642, auc=0.7291)
+  Early stopping at epoch 36
+  Saved best model → ./results/c1s01_raw/v4.pt (val_score=0.6284, val_loss=0.5404, train_thr=0.4569)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=113.36, std=36.57 mg/dL | pos_weight=3.82 (raw_ratio=14.6)
+  STMGMDataset: 1622 samples (hypo=104, normal=1518, ratio=14.6)
+  STMGMDataset: 405 samples (hypo=26, normal=379, ratio=14.6)
+  Epoch   1/100: train_loss=0.7021 (cls=0.6740, reg=0.7301) | val_loss=0.6558 (reg=0.6955, auc=0.5312)
+  Epoch  10/100: train_loss=0.5137 (cls=0.4825, reg=0.5449) | val_loss=0.5851 (reg=0.6164, auc=0.6879)
+  Epoch  20/100: train_loss=0.2961 (cls=0.2381, reg=0.3542) | val_loss=0.6438 (reg=0.6102, auc=0.7091)
+  Epoch  30/100: train_loss=0.1750 (cls=0.0836, reg=0.2663) | val_loss=0.7015 (reg=0.5448, auc=0.7299)
+  Epoch  40/100: train_loss=0.1202 (cls=0.0527, reg=0.1877) | val_loss=0.7584 (reg=0.5549, auc=0.7717)
+  Epoch  50/100: train_loss=0.0808 (cls=0.0268, reg=0.1348) | val_loss=0.8715 (reg=0.5340, auc=0.7367)
+  Epoch  60/100: train_loss=0.0490 (cls=0.0127, reg=0.0854) | val_loss=0.8087 (reg=0.5093, auc=0.7828)
+  Early stopping at epoch 69
+  Saved best model → ./results/c1s01_raw/v5.pt (val_score=0.6016, val_loss=0.6945, train_thr=0.6200)
+
+Training summary saved to ./results/c1s01_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 158.8s ---
+
+>>> [2026-11-12 01:15:51] Evaluating ST-MGM (M9) for c1s01_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c1s01_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c1s01_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.7512, AUPRC=0.4415, F1=0.4000, BalAcc=0.6460, Sens=0.3077, Spec=0.9842, Acc=0.9409
+  Regression:     RMSE=30.49 mg/dL, MAE=21.15 mg/dL, MARD=20.52%, Pearson r=0.4647
+  Parkes Grid:    A+B=95.57% (Zone A=67.24%, Zone B=28.33%)
+  Threshold:      train_eer=0.2487 (val_eer=0.5504)
+
+--- v2 ---
+  Classification: AUC=0.6866, AUPRC=0.2419, F1=0.2162, BalAcc=0.5677, Sens=0.1538, Spec=0.9816, Acc=0.9286
+  Regression:     RMSE=28.07 mg/dL, MAE=20.67 mg/dL, MARD=19.20%, Pearson r=0.6080
+  Parkes Grid:    A+B=96.55% (Zone A=69.46%, Zone B=27.09%)
+  Threshold:      train_eer=0.6042 (val_eer=0.2262)
+
+--- v3 ---
+  Classification: AUC=0.7861, AUPRC=0.4269, F1=0.3243, BalAcc=0.6088, Sens=0.2308, Spec=0.9868, Acc=0.9383
+  Regression:     RMSE=32.17 mg/dL, MAE=22.91 mg/dL, MARD=20.80%, Pearson r=0.6102
+  Parkes Grid:    A+B=96.30% (Zone A=65.68%, Zone B=30.62%)
+  Threshold:      train_eer=0.6200 (val_eer=0.2764)
+
+--- v4 ---
+  Classification: AUC=0.7418, AUPRC=0.2317, F1=0.3000, BalAcc=0.6401, Sens=0.3462, Spec=0.9340, Acc=0.8963
+  Regression:     RMSE=30.66 mg/dL, MAE=23.64 mg/dL, MARD=22.68%, Pearson r=0.5673
+  Parkes Grid:    A+B=94.57% (Zone A=63.95%, Zone B=30.62%)
+  Threshold:      train_eer=0.4569 (val_eer=0.4632)
+
+--- v5 ---
+  Classification: AUC=0.8001, AUPRC=0.4121, F1=0.3774, BalAcc=0.6699, Sens=0.3846, Spec=0.9551, Acc=0.9185
+  Regression:     RMSE=30.89 mg/dL, MAE=22.61 mg/dL, MARD=20.79%, Pearson r=0.6292
+  Parkes Grid:    A+B=96.30% (Zone A=66.17%, Zone B=30.12%)
+  Threshold:      train_eer=0.6200 (val_eer=0.2436)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7532 ± 0.0396
+  AUPRC         : 0.3508 ± 0.0936
+  F1            : 0.3236 ± 0.0645
+  BALANCED_ACC  : 0.6265 ± 0.0353
+  SENSITIVITY   : 0.2846 ± 0.0828
+  SPECIFICITY   : 0.9684 ± 0.0206
+  ACC           : 0.9245 ± 0.0162
+  RMSE          : 30.4549 ± 1.3310 mg/dL
+  MAE           : 22.1981 ± 1.1126 mg/dL
+  MARD          : 20.7995 ± 1.1111%
+  PEARSON_R     : 0.5759 ± 0.0591
+  PARKES_ZONE_A : 66.5004 ± 1.8210%
+  PARKES_ZONE_B : 29.3553 ± 1.4108%
+  PARKES_AB     : 95.8557 ± 0.7232%
+
+Results saved to ./results/c1s01_raw/evaluation_results.json
+--- Finished successfully in 1.9s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:16:23] Training ST-MGM (M9) for c1s02_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c1s02_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c1s02_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=155.34, std=44.20 mg/dL | pos_weight=10.00 (raw_ratio=384.0)
+  STMGMDataset: 2310 samples (hypo=6, normal=2304, ratio=384.0)
+  STMGMDataset: 578 samples (hypo=2, normal=576, ratio=288.0)
+  Epoch   1/100: train_loss=0.4174 (cls=0.1331, reg=0.7017) | val_loss=0.4083 (reg=0.6475, auc=0.3151)
+  Epoch  10/100: train_loss=0.2942 (cls=0.0821, reg=0.5062) | val_loss=0.3904 (reg=0.6335, auc=0.8333)
+  Epoch  20/100: train_loss=0.1890 (cls=0.0399, reg=0.3381) | val_loss=0.4419 (reg=0.6830, auc=0.6215)
+  Epoch  30/100: train_loss=0.0951 (cls=0.0069, reg=0.1833) | val_loss=0.4485 (reg=0.6657, auc=0.6311)
+  Early stopping at epoch 33
+  Saved best model → ./results/c1s02_raw/v1.pt (val_score=0.7087, val_loss=0.3823, train_thr=0.2227)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=155.96, std=45.27 mg/dL | pos_weight=10.00 (raw_ratio=384.0)
+  STMGMDataset: 2310 samples (hypo=6, normal=2304, ratio=384.0)
+  STMGMDataset: 578 samples (hypo=2, normal=576, ratio=288.0)
+  Epoch   1/100: train_loss=0.4310 (cls=0.1452, reg=0.7168) | val_loss=0.3567 (reg=0.5468, auc=0.4878)
+  Epoch  10/100: train_loss=0.2816 (cls=0.0729, reg=0.4903) | val_loss=0.3525 (reg=0.5423, auc=0.6814)
+  Epoch  20/100: train_loss=0.1667 (cls=0.0242, reg=0.3092) | val_loss=0.4077 (reg=0.6027, auc=0.5747)
+  Early stopping at epoch 27
+  Saved best model → ./results/c1s02_raw/v2.pt (val_score=0.5955, val_loss=0.3218, train_thr=0.2000)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=155.71, std=44.47 mg/dL | pos_weight=10.00 (raw_ratio=384.0)
+  STMGMDataset: 2310 samples (hypo=6, normal=2304, ratio=384.0)
+  STMGMDataset: 578 samples (hypo=2, normal=576, ratio=288.0)
+  Epoch   1/100: train_loss=0.4091 (cls=0.1394, reg=0.6788) | val_loss=0.4032 (reg=0.6342, auc=0.1372)
+  Epoch  10/100: train_loss=0.2786 (cls=0.0936, reg=0.4637) | val_loss=0.4093 (reg=0.6885, auc=0.9010)
+  Epoch  20/100: train_loss=0.1420 (cls=0.0207, reg=0.2633) | val_loss=0.4906 (reg=0.7777, auc=0.7405)
+  Epoch  30/100: train_loss=0.0712 (cls=0.0059, reg=0.1365) | val_loss=0.5042 (reg=0.7895, auc=0.7500)
+  Early stopping at epoch 30
+  Saved best model → ./results/c1s02_raw/v3.pt (val_score=0.7380, val_loss=0.4093, train_thr=0.2016)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=155.62, std=44.34 mg/dL | pos_weight=10.00 (raw_ratio=329.1)
+  STMGMDataset: 2311 samples (hypo=7, normal=2304, ratio=329.1)
+  STMGMDataset: 577 samples (hypo=1, normal=576, ratio=576.0)
+  Epoch   1/100: train_loss=0.4334 (cls=0.1655, reg=0.7014) | val_loss=0.3891 (reg=0.6794, auc=0.2153)
+  Epoch  10/100: train_loss=0.3126 (cls=0.1148, reg=0.5104) | val_loss=0.3469 (reg=0.6102, auc=0.7396)
+  Epoch  20/100: train_loss=0.1761 (cls=0.0571, reg=0.2952) | val_loss=0.3976 (reg=0.6879, auc=0.5104)
+  Early stopping at epoch 29
+  Saved best model → ./results/c1s02_raw/v4.pt (val_score=0.7181, val_loss=0.3517, train_thr=0.2000)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=155.26, std=44.64 mg/dL | pos_weight=10.00 (raw_ratio=329.1)
+  STMGMDataset: 2311 samples (hypo=7, normal=2304, ratio=329.1)
+  STMGMDataset: 577 samples (hypo=1, normal=576, ratio=576.0)
+  Epoch   1/100: train_loss=0.4259 (cls=0.1604, reg=0.6913) | val_loss=0.3523 (reg=0.6163, auc=0.5747)
+  Epoch  10/100: train_loss=0.3003 (cls=0.1085, reg=0.4921) | val_loss=0.3637 (reg=0.6363, auc=0.6406)
+  Epoch  20/100: train_loss=0.1895 (cls=0.0614, reg=0.3177) | val_loss=0.4136 (reg=0.7307, auc=0.7240)
+  Early stopping at epoch 25
+  Saved best model → ./results/c1s02_raw/v5.pt (val_score=0.6393, val_loss=0.3341, train_thr=0.2000)
+
+Training summary saved to ./results/c1s02_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 103.2s ---
+
+>>> [2026-11-12 01:18:07] Evaluating ST-MGM (M9) for c1s02_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c1s02_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c1s02_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.7960, AUPRC=0.0188, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9965
+  Regression:     RMSE=41.06 mg/dL, MAE=30.78 mg/dL, MARD=21.25%, Pearson r=0.4597
+  Parkes Grid:    A+B=96.37% (Zone A=57.44%, Zone B=38.93%)
+  Threshold:      train_eer=0.2227 (val_eer=0.2000)
+
+--- v2 ---
+  Classification: AUC=0.7995, AUPRC=0.0126, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9965
+  Regression:     RMSE=37.60 mg/dL, MAE=29.00 mg/dL, MARD=20.41%, Pearson r=0.4340
+  Parkes Grid:    A+B=98.10% (Zone A=59.69%, Zone B=38.41%)
+  Threshold:      train_eer=0.2000 (val_eer=0.2000)
+
+--- v3 ---
+  Classification: AUC=0.9010, AUPRC=0.0302, F1=0.0000, BalAcc=0.4991, Sens=0.0000, Spec=0.9983, Acc=0.9948
+  Regression:     RMSE=44.39 mg/dL, MAE=32.73 mg/dL, MARD=21.79%, Pearson r=0.2942
+  Parkes Grid:    A+B=97.06% (Zone A=55.19%, Zone B=41.87%)
+  Threshold:      train_eer=0.2016 (val_eer=0.2076)
+
+--- v4 ---
+  Classification: AUC=0.8090, AUPRC=0.0090, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9983
+  Regression:     RMSE=41.98 mg/dL, MAE=30.78 mg/dL, MARD=21.33%, Pearson r=0.4065
+  Parkes Grid:    A+B=96.36% (Zone A=59.62%, Zone B=36.74%)
+  Threshold:      train_eer=0.2000 (val_eer=0.2000)
+
+--- v5 ---
+  Classification: AUC=0.9062, AUPRC=0.0182, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9983
+  Regression:     RMSE=40.80 mg/dL, MAE=31.41 mg/dL, MARD=21.71%, Pearson r=0.4044
+  Parkes Grid:    A+B=97.75% (Zone A=57.02%, Zone B=40.73%)
+  Threshold:      train_eer=0.2000 (val_eer=0.2000)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.8424 ± 0.0502
+  AUPRC         : 0.0178 ± 0.0072
+  F1            : 0.0000 ± 0.0000
+  BALANCED_ACC  : 0.4998 ± 0.0003
+  SENSITIVITY   : 0.0000 ± 0.0000
+  SPECIFICITY   : 0.9997 ± 0.0007
+  ACC           : 0.9969 ± 0.0013
+  RMSE          : 41.1638 ± 2.1875 mg/dL
+  MAE           : 30.9394 ± 1.2047 mg/dL
+  MARD          : 21.3002 ± 0.4918%
+  PEARSON_R     : 0.3998 ± 0.0565
+  PARKES_ZONE_A : 57.7912 ± 1.6985%
+  PARKES_ZONE_B : 39.3348 ± 1.7949%
+  PARKES_AB     : 97.1260 ± 0.7064%
+
+Results saved to ./results/c1s02_raw/evaluation_results.json
+--- Finished successfully in 1.9s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:18:38] Training ST-MGM (M9) for c1s03_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c1s03_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c1s03_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=144.58, std=55.09 mg/dL | pos_weight=5.60 (raw_ratio=31.4)
+  STMGMDataset: 2168 samples (hypo=67, normal=2101, ratio=31.4)
+  STMGMDataset: 542 samples (hypo=16, normal=526, ratio=32.9)
+  Epoch   1/100: train_loss=0.6352 (cls=0.5414, reg=0.7290) | val_loss=0.6034 (reg=0.7554, auc=0.7079)
+  Epoch  10/100: train_loss=0.4627 (cls=0.3815, reg=0.5439) | val_loss=0.6858 (reg=0.8107, auc=0.6214)
+  Epoch  20/100: train_loss=0.2606 (cls=0.1637, reg=0.3574) | val_loss=0.6726 (reg=0.7738, auc=0.6969)
+  Early stopping at epoch 26
+  Saved best model → ./results/c1s03_raw/v1.pt (val_score=0.7913, val_loss=0.5420, train_thr=0.2462)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=145.49, std=56.62 mg/dL | pos_weight=5.60 (raw_ratio=31.4)
+  STMGMDataset: 2168 samples (hypo=67, normal=2101, ratio=31.4)
+  STMGMDataset: 542 samples (hypo=16, normal=526, ratio=32.9)
+  Epoch   1/100: train_loss=0.6202 (cls=0.5005, reg=0.7399) | val_loss=0.5325 (reg=0.6035, auc=0.6387)
+  Epoch  10/100: train_loss=0.4405 (cls=0.3737, reg=0.5072) | val_loss=0.5257 (reg=0.5832, auc=0.6820)
+  Epoch  20/100: train_loss=0.1918 (cls=0.1007, reg=0.2829) | val_loss=0.6435 (reg=0.6168, auc=0.6723)
+  Epoch  30/100: train_loss=0.1092 (cls=0.0560, reg=0.1624) | val_loss=0.7113 (reg=0.5877, auc=0.6806)
+  Epoch  40/100: train_loss=0.0606 (cls=0.0314, reg=0.0897) | val_loss=0.8049 (reg=0.5618, auc=0.6604)
+  Epoch  50/100: train_loss=0.0330 (cls=0.0072, reg=0.0589) | val_loss=0.8247 (reg=0.5611, auc=0.7373)
+  Epoch  60/100: train_loss=0.0236 (cls=0.0046, reg=0.0425) | val_loss=0.8506 (reg=0.5336, auc=0.7524)
+  Epoch  70/100: train_loss=0.0188 (cls=0.0043, reg=0.0333) | val_loss=0.8978 (reg=0.5237, auc=0.7053)
+  Epoch  80/100: train_loss=0.0174 (cls=0.0036, reg=0.0311) | val_loss=0.9077 (reg=0.5341, auc=0.7273)
+  Early stopping at epoch 81
+  Saved best model → ./results/c1s03_raw/v2.pt (val_score=0.6475, val_loss=0.8379, train_thr=0.6200)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=145.96, std=56.73 mg/dL | pos_weight=5.64 (raw_ratio=31.8)
+  STMGMDataset: 2168 samples (hypo=66, normal=2102, ratio=31.8)
+  STMGMDataset: 542 samples (hypo=17, normal=525, ratio=30.9)
+  Epoch   1/100: train_loss=0.6370 (cls=0.5132, reg=0.7609) | val_loss=0.5546 (reg=0.5833, auc=0.5682)
+  Epoch  10/100: train_loss=0.3989 (cls=0.3075, reg=0.4903) | val_loss=0.5782 (reg=0.5926, auc=0.6424)
+  Epoch  20/100: train_loss=0.2251 (cls=0.1167, reg=0.3335) | val_loss=0.6957 (reg=0.6220, auc=0.6077)
+  Early stopping at epoch 25
+  Saved best model → ./results/c1s03_raw/v3.pt (val_score=0.7675, val_loss=0.5443, train_thr=0.2883)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=145.04, std=55.63 mg/dL | pos_weight=5.64 (raw_ratio=31.8)
+  STMGMDataset: 2168 samples (hypo=66, normal=2102, ratio=31.8)
+  STMGMDataset: 542 samples (hypo=17, normal=525, ratio=30.9)
+  Epoch   1/100: train_loss=0.6127 (cls=0.5134, reg=0.7120) | val_loss=0.6176 (reg=0.7064, auc=0.5402)
+  Epoch  10/100: train_loss=0.4482 (cls=0.3515, reg=0.5449) | val_loss=0.6395 (reg=0.6793, auc=0.5848)
+  Epoch  20/100: train_loss=0.2358 (cls=0.1260, reg=0.3457) | val_loss=0.7635 (reg=0.7642, auc=0.6156)
+  Epoch  30/100: train_loss=0.1280 (cls=0.0503, reg=0.2057) | val_loss=0.8987 (reg=0.7943, auc=0.6064)
+  Early stopping at epoch 39
+  Saved best model → ./results/c1s03_raw/v4.pt (val_score=0.8262, val_loss=0.6626, train_thr=0.2097)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=145.61, std=55.87 mg/dL | pos_weight=5.64 (raw_ratio=31.8)
+  STMGMDataset: 2168 samples (hypo=66, normal=2102, ratio=31.8)
+  STMGMDataset: 542 samples (hypo=17, normal=525, ratio=30.9)
+  Epoch   1/100: train_loss=0.6435 (cls=0.5224, reg=0.7645) | val_loss=0.5660 (reg=0.6521, auc=0.6571)
+  Epoch  10/100: train_loss=0.4186 (cls=0.3215, reg=0.5158) | val_loss=0.5519 (reg=0.6252, auc=0.7377)
+  Epoch  20/100: train_loss=0.2328 (cls=0.1446, reg=0.3209) | val_loss=0.6815 (reg=0.6415, auc=0.6892)
+  Early stopping at epoch 26
+  Saved best model → ./results/c1s03_raw/v5.pt (val_score=0.7458, val_loss=0.5320, train_thr=0.3011)
+
+Training summary saved to ./results/c1s03_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 129.4s ---
+
+>>> [2026-11-12 01:20:48] Evaluating ST-MGM (M9) for c1s03_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c1s03_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c1s03_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.7933, AUPRC=0.0822, F1=0.1609, BalAcc=0.6579, Sens=0.4375, Spec=0.8783, Acc=0.8653
+  Regression:     RMSE=54.43 mg/dL, MAE=42.31 mg/dL, MARD=29.90%, Pearson r=0.4331
+  Parkes Grid:    A+B=91.51% (Zone A=38.56%, Zone B=52.95%)
+  Threshold:      train_eer=0.2462 (val_eer=0.2840)
+
+--- v2 ---
+  Classification: AUC=0.7529, AUPRC=0.1155, F1=0.0000, BalAcc=0.4962, Sens=0.0000, Spec=0.9924, Acc=0.9631
+  Regression:     RMSE=48.64 mg/dL, MAE=36.59 mg/dL, MARD=27.17%, Pearson r=0.4798
+  Parkes Grid:    A+B=92.80% (Zone A=49.82%, Zone B=42.99%)
+  Threshold:      train_eer=0.6200 (val_eer=0.5527)
+
+--- v3 ---
+  Classification: AUC=0.5927, AUPRC=0.1039, F1=0.0541, BalAcc=0.5113, Sens=0.0588, Spec=0.9638, Acc=0.9354
+  Regression:     RMSE=50.26 mg/dL, MAE=40.29 mg/dL, MARD=31.54%, Pearson r=0.3143
+  Parkes Grid:    A+B=91.14% (Zone A=38.56%, Zone B=52.58%)
+  Threshold:      train_eer=0.2883 (val_eer=0.2206)
+
+--- v4 ---
+  Classification: AUC=0.6616, AUPRC=0.0763, F1=0.1212, BalAcc=0.5455, Sens=0.1176, Spec=0.9733, Acc=0.9465
+  Regression:     RMSE=53.75 mg/dL, MAE=40.97 mg/dL, MARD=29.76%, Pearson r=0.4001
+  Parkes Grid:    A+B=92.62% (Zone A=42.25%, Zone B=50.37%)
+  Threshold:      train_eer=0.2097 (val_eer=0.2851)
+
+--- v5 ---
+  Classification: AUC=0.7556, AUPRC=0.0916, F1=0.1944, BalAcc=0.6602, Sens=0.4118, Spec=0.9086, Acc=0.8930
+  Regression:     RMSE=52.33 mg/dL, MAE=40.29 mg/dL, MARD=30.58%, Pearson r=0.3940
+  Parkes Grid:    A+B=90.77% (Zone A=42.80%, Zone B=47.97%)
+  Threshold:      train_eer=0.3011 (val_eer=0.3026)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7112 ± 0.0734
+  AUPRC         : 0.0939 ± 0.0143
+  F1            : 0.1061 ± 0.0707
+  BALANCED_ACC  : 0.5742 ± 0.0711
+  SENSITIVITY   : 0.2051 ± 0.1832
+  SPECIFICITY   : 0.9433 ± 0.0428
+  ACC           : 0.9207 ± 0.0361
+  RMSE          : 51.8832 ± 2.1607 mg/dL
+  MAE           : 40.0887 ± 1.9003 mg/dL
+  MARD          : 29.7918 ± 1.4532%
+  PEARSON_R     : 0.4043 ± 0.0543
+  PARKES_ZONE_A : 42.3985 ± 4.1147%
+  PARKES_ZONE_B : 49.3727 ± 3.6559%
+  PARKES_AB     : 91.7712 ± 0.8051%
+
+Results saved to ./results/c1s03_raw/evaluation_results.json
+--- Finished successfully in 1.9s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:21:20] Training ST-MGM (M9) for c1s04_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c1s04_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c1s04_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=153.17, std=48.54 mg/dL | pos_weight=10.00 (raw_ratio=370.8)
+  STMGMDataset: 1859 samples (hypo=5, normal=1854, ratio=370.8)
+  STMGMDataset: 465 samples (hypo=1, normal=464, ratio=464.0)
+  Epoch   1/100: train_loss=0.3963 (cls=0.1031, reg=0.6894) | val_loss=0.3410 (reg=0.6041, auc=0.9871)
+  Epoch  10/100: train_loss=0.2386 (cls=0.0387, reg=0.4385) | val_loss=0.2774 (reg=0.5046, auc=0.9849)
+  Epoch  20/100: train_loss=0.1342 (cls=0.0084, reg=0.2600) | val_loss=0.3704 (reg=0.6585, auc=0.9871)
+  Epoch  30/100: train_loss=0.0710 (cls=0.0066, reg=0.1354) | val_loss=0.3535 (reg=0.6231, auc=0.9871)
+  Early stopping at epoch 30
+  Saved best model → ./results/c1s04_raw/v1.pt (val_score=0.5122, val_loss=0.2774, train_thr=0.4235)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=152.42, std=47.98 mg/dL | pos_weight=10.00 (raw_ratio=370.8)
+  STMGMDataset: 1859 samples (hypo=5, normal=1854, ratio=370.8)
+  STMGMDataset: 465 samples (hypo=1, normal=464, ratio=464.0)
+  Epoch   1/100: train_loss=0.3989 (cls=0.1182, reg=0.6795) | val_loss=0.3507 (reg=0.6213, auc=0.9784)
+  Epoch  10/100: train_loss=0.2413 (cls=0.0434, reg=0.4393) | val_loss=0.3340 (reg=0.6376, auc=1.0000)
+  Epoch  20/100: train_loss=0.1274 (cls=0.0155, reg=0.2393) | val_loss=0.3306 (reg=0.6481, auc=1.0000)
+  Early stopping at epoch 25
+  Saved best model → ./results/c1s04_raw/v2.pt (val_score=0.5898, val_loss=0.3214, train_thr=0.2059)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=153.36, std=48.90 mg/dL | pos_weight=10.00 (raw_ratio=370.8)
+  STMGMDataset: 1859 samples (hypo=5, normal=1854, ratio=370.8)
+  STMGMDataset: 465 samples (hypo=1, normal=464, ratio=464.0)
+  Epoch   1/100: train_loss=0.3858 (cls=0.1025, reg=0.6690) | val_loss=0.3394 (reg=0.5944, auc=0.9784)
+  Epoch  10/100: train_loss=0.2268 (cls=0.0431, reg=0.4105) | val_loss=0.3305 (reg=0.6269, auc=0.9957)
+  Epoch  20/100: train_loss=0.1119 (cls=0.0142, reg=0.2096) | val_loss=0.3311 (reg=0.5900, auc=0.9935)
+  Early stopping at epoch 24
+  Saved best model → ./results/c1s04_raw/v3.pt (val_score=0.5439, val_loss=0.3046, train_thr=0.2000)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=153.11, std=49.22 mg/dL | pos_weight=10.00 (raw_ratio=463.8)
+  STMGMDataset: 1859 samples (hypo=4, normal=1855, ratio=463.8)
+  STMGMDataset: 465 samples (hypo=2, normal=463, ratio=231.5)
+  Epoch   1/100: train_loss=0.3874 (cls=0.1101, reg=0.6646) | val_loss=0.3597 (reg=0.5812, auc=0.9287)
+  Epoch  10/100: train_loss=0.2367 (cls=0.0585, reg=0.4148) | val_loss=0.3114 (reg=0.5282, auc=0.9978)
+  Epoch  20/100: train_loss=0.1183 (cls=0.0203, reg=0.2163) | val_loss=0.3642 (reg=0.6636, auc=0.9870)
+  Early stopping at epoch 26
+  Saved best model → ./results/c1s04_raw/v4.pt (val_score=0.5220, val_loss=0.3112, train_thr=0.2000)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=152.01, std=49.08 mg/dL | pos_weight=10.00 (raw_ratio=371.0)
+  STMGMDataset: 1860 samples (hypo=5, normal=1855, ratio=371.0)
+  STMGMDataset: 464 samples (hypo=1, normal=463, ratio=463.0)
+  Epoch   1/100: train_loss=0.3817 (cls=0.1007, reg=0.6628) | val_loss=0.3481 (reg=0.6036, auc=0.8963)
+  Epoch  10/100: train_loss=0.2310 (cls=0.0352, reg=0.4268) | val_loss=0.3716 (reg=0.6437, auc=0.8920)
+  Epoch  20/100: train_loss=0.1172 (cls=0.0135, reg=0.2210) | val_loss=0.3672 (reg=0.6087, auc=0.8661)
+  Early stopping at epoch 23
+  Saved best model → ./results/c1s04_raw/v5.pt (val_score=0.5392, val_loss=0.2972, train_thr=0.2031)
+
+Training summary saved to ./results/c1s04_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 76.9s ---
+
+>>> [2026-11-12 01:22:37] Evaluating ST-MGM (M9) for c1s04_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c1s04_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c1s04_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.9849, AUPRC=0.1250, F1=0.0000, BalAcc=0.4946, Sens=0.0000, Spec=0.9892, Acc=0.9871
+  Regression:     RMSE=41.04 mg/dL, MAE=30.31 mg/dL, MARD=20.27%, Pearson r=0.5625
+  Parkes Grid:    A+B=98.49% (Zone A=58.06%, Zone B=40.43%)
+  Threshold:      train_eer=0.4235 (val_eer=0.3026)
+
+--- v2 ---
+  Classification: AUC=1.0000, AUPRC=1.0000, F1=0.5000, BalAcc=0.9978, Sens=1.0000, Spec=0.9957, Acc=0.9957
+  Regression:     RMSE=44.30 mg/dL, MAE=31.15 mg/dL, MARD=19.69%, Pearson r=0.5409
+  Parkes Grid:    A+B=98.28% (Zone A=60.22%, Zone B=38.06%)
+  Threshold:      train_eer=0.2059 (val_eer=0.2528)
+
+--- v3 ---
+  Classification: AUC=0.9914, AUPRC=0.2000, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9978
+  Regression:     RMSE=42.67 mg/dL, MAE=32.30 mg/dL, MARD=22.20%, Pearson r=0.4624
+  Parkes Grid:    A+B=98.06% (Zone A=53.33%, Zone B=44.73%)
+  Threshold:      train_eer=0.2000 (val_eer=0.2000)
+
+--- v4 ---
+  Classification: AUC=0.9978, AUPRC=0.5833, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9957
+  Regression:     RMSE=42.09 mg/dL, MAE=31.73 mg/dL, MARD=21.38%, Pearson r=0.4577
+  Parkes Grid:    A+B=98.06% (Zone A=56.99%, Zone B=41.08%)
+  Threshold:      train_eer=0.2000 (val_eer=0.2000)
+
+--- v5 ---
+  Classification: AUC=0.9546, AUPRC=0.0455, F1=0.0000, BalAcc=0.5000, Sens=0.0000, Spec=1.0000, Acc=0.9978
+  Regression:     RMSE=41.81 mg/dL, MAE=31.96 mg/dL, MARD=21.25%, Pearson r=0.4691
+  Parkes Grid:    A+B=98.28% (Zone A=56.47%, Zone B=41.81%)
+  Threshold:      train_eer=0.2031 (val_eer=0.2000)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.9858 ± 0.0164
+  AUPRC         : 0.3908 ± 0.3562
+  F1            : 0.1000 ± 0.2000
+  BALANCED_ACC  : 0.5985 ± 0.1997
+  SENSITIVITY   : 0.2000 ± 0.4000
+  SPECIFICITY   : 0.9970 ± 0.0042
+  ACC           : 0.9948 ± 0.0040
+  RMSE          : 42.3808 ± 1.0925 mg/dL
+  MAE           : 31.4912 ± 0.6971 mg/dL
+  MARD          : 20.9588 ± 0.8803%
+  PEARSON_R     : 0.4985 ± 0.0441
+  PARKES_ZONE_A : 57.0135 ± 2.2450%
+  PARKES_ZONE_B : 41.2223 ± 2.1577%
+  PARKES_AB     : 98.2358 ± 0.1607%
+
+Results saved to ./results/c1s04_raw/evaluation_results.json
+--- Finished successfully in 1.9s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:23:09] Training ST-MGM (M9) for c1s05_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c1s05_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c1s05_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=108.94, std=27.00 mg/dL | pos_weight=4.93 (raw_ratio=24.3)
+  STMGMDataset: 2280 samples (hypo=90, normal=2190, ratio=24.3)
+  STMGMDataset: 570 samples (hypo=22, normal=548, ratio=24.9)
+  Epoch   1/100: train_loss=0.6514 (cls=0.5678, reg=0.7351) | val_loss=0.5965 (reg=0.6716, auc=0.5985)
+  Epoch  10/100: train_loss=0.4203 (cls=0.3440, reg=0.4967) | val_loss=0.5849 (reg=0.6438, auc=0.6992)
+  Epoch  20/100: train_loss=0.2445 (cls=0.1388, reg=0.3502) | val_loss=0.6869 (reg=0.6907, auc=0.6403)
+  Early stopping at epoch 28
+  Saved best model → ./results/c1s05_raw/v1.pt (val_score=0.7934, val_loss=0.5768, train_thr=0.3498)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=108.92, std=27.38 mg/dL | pos_weight=4.93 (raw_ratio=24.3)
+  STMGMDataset: 2280 samples (hypo=90, normal=2190, ratio=24.3)
+  STMGMDataset: 570 samples (hypo=22, normal=548, ratio=24.9)
+  Epoch   1/100: train_loss=0.6333 (cls=0.5362, reg=0.7304) | val_loss=0.5820 (reg=0.6082, auc=0.5520)
+  Epoch  10/100: train_loss=0.4457 (cls=0.3749, reg=0.5164) | val_loss=0.5424 (reg=0.5569, auc=0.7138)
+  Epoch  20/100: train_loss=0.3017 (cls=0.2233, reg=0.3801) | val_loss=0.6516 (reg=0.5893, auc=0.6706)
+  Epoch  30/100: train_loss=0.1811 (cls=0.0880, reg=0.2742) | val_loss=0.7162 (reg=0.6049, auc=0.6497)
+  Early stopping at epoch 34
+  Saved best model → ./results/c1s05_raw/v2.pt (val_score=0.6619, val_loss=0.5300, train_thr=0.2955)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=109.57, std=27.50 mg/dL | pos_weight=4.93 (raw_ratio=24.3)
+  STMGMDataset: 2280 samples (hypo=90, normal=2190, ratio=24.3)
+  STMGMDataset: 570 samples (hypo=22, normal=548, ratio=24.9)
+  Epoch   1/100: train_loss=0.6572 (cls=0.5748, reg=0.7396) | val_loss=0.5525 (reg=0.5946, auc=0.6053)
+  Epoch  10/100: train_loss=0.4277 (cls=0.3529, reg=0.5026) | val_loss=0.5286 (reg=0.5555, auc=0.7127)
+  Epoch  20/100: train_loss=0.2500 (cls=0.1446, reg=0.3554) | val_loss=0.6537 (reg=0.5476, auc=0.6472)
+  Early stopping at epoch 29
+  Saved best model → ./results/c1s05_raw/v3.pt (val_score=0.6690, val_loss=0.5051, train_thr=0.2953)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=108.73, std=27.15 mg/dL | pos_weight=4.96 (raw_ratio=24.6)
+  STMGMDataset: 2280 samples (hypo=89, normal=2191, ratio=24.6)
+  STMGMDataset: 570 samples (hypo=23, normal=547, ratio=23.8)
+  Epoch   1/100: train_loss=0.6385 (cls=0.5482, reg=0.7288) | val_loss=0.5900 (reg=0.6554, auc=0.5929)
+  Epoch  10/100: train_loss=0.4239 (cls=0.3631, reg=0.4847) | val_loss=0.5636 (reg=0.6501, auc=0.7580)
+  Epoch  20/100: train_loss=0.2310 (cls=0.1250, reg=0.3370) | val_loss=0.6636 (reg=0.6348, auc=0.6733)
+  Early stopping at epoch 27
+  Saved best model → ./results/c1s05_raw/v4.pt (val_score=0.7142, val_loss=0.5236, train_thr=0.2361)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=108.52, std=26.77 mg/dL | pos_weight=4.96 (raw_ratio=24.6)
+  STMGMDataset: 2280 samples (hypo=89, normal=2191, ratio=24.6)
+  STMGMDataset: 570 samples (hypo=23, normal=547, ratio=23.8)
+  Epoch   1/100: train_loss=0.6246 (cls=0.5512, reg=0.6979) | val_loss=0.6033 (reg=0.7017, auc=0.6596)
+  Epoch  10/100: train_loss=0.4381 (cls=0.3420, reg=0.5342) | val_loss=0.5596 (reg=0.6558, auc=0.7702)
+  Epoch  20/100: train_loss=0.2700 (cls=0.1508, reg=0.3893) | val_loss=0.6355 (reg=0.7014, auc=0.7976)
+  Early stopping at epoch 26
+  Saved best model → ./results/c1s05_raw/v5.pt (val_score=0.7376, val_loss=0.5372, train_thr=0.2742)
+
+Training summary saved to ./results/c1s05_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 102.1s ---
+
+>>> [2026-11-12 01:24:51] Evaluating ST-MGM (M9) for c1s05_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c1s05_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c1s05_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.6482, AUPRC=0.2935, F1=0.2500, BalAcc=0.6345, Sens=0.3182, Spec=0.9507, Acc=0.9263
+  Regression:     RMSE=25.20 mg/dL, MAE=19.51 mg/dL, MARD=18.79%, Pearson r=0.4358
+  Parkes Grid:    A+B=98.42% (Zone A=69.12%, Zone B=29.30%)
+  Threshold:      train_eer=0.3498 (val_eer=0.2877)
+
+--- v2 ---
+  Classification: AUC=0.7118, AUPRC=0.2175, F1=0.2353, BalAcc=0.6154, Sens=0.2727, Spec=0.9580, Acc=0.9316
+  Regression:     RMSE=23.24 mg/dL, MAE=18.16 mg/dL, MARD=17.94%, Pearson r=0.4973
+  Parkes Grid:    A+B=97.54% (Zone A=74.91%, Zone B=22.63%)
+  Threshold:      train_eer=0.2955 (val_eer=0.2374)
+
+--- v3 ---
+  Classification: AUC=0.7094, AUPRC=0.1268, F1=0.1918, BalAcc=0.6189, Sens=0.3182, Spec=0.9197, Acc=0.8965
+  Regression:     RMSE=23.53 mg/dL, MAE=18.15 mg/dL, MARD=18.05%, Pearson r=0.4146
+  Parkes Grid:    A+B=97.72% (Zone A=73.86%, Zone B=23.86%)
+  Threshold:      train_eer=0.2953 (val_eer=0.3504)
+
+--- v4 ---
+  Classification: AUC=0.7875, AUPRC=0.2212, F1=0.2680, BalAcc=0.7269, Sens=0.5652, Spec=0.8885, Acc=0.8754
+  Regression:     RMSE=25.02 mg/dL, MAE=19.58 mg/dL, MARD=18.84%, Pearson r=0.4143
+  Parkes Grid:    A+B=96.84% (Zone A=68.25%, Zone B=28.60%)
+  Threshold:      train_eer=0.2361 (val_eer=0.2684)
+
+--- v5 ---
+  Classification: AUC=0.7695, AUPRC=0.3036, F1=0.2338, BalAcc=0.6545, Sens=0.3913, Spec=0.9177, Acc=0.8965
+  Regression:     RMSE=25.05 mg/dL, MAE=19.58 mg/dL, MARD=18.63%, Pearson r=0.4865
+  Parkes Grid:    A+B=98.07% (Zone A=68.25%, Zone B=29.82%)
+  Threshold:      train_eer=0.2742 (val_eer=0.2841)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7253 ± 0.0494
+  AUPRC         : 0.2325 ± 0.0637
+  F1            : 0.2358 ± 0.0252
+  BALANCED_ACC  : 0.6500 ± 0.0408
+  SENSITIVITY   : 0.3731 ± 0.1033
+  SPECIFICITY   : 0.9269 ± 0.0251
+  ACC           : 0.9053 ± 0.0209
+  RMSE          : 24.4075 ± 0.8434 mg/dL
+  MAE           : 18.9943 ± 0.6863 mg/dL
+  MARD          : 18.4495 ± 0.3790%
+  PEARSON_R     : 0.4497 ± 0.0355
+  PARKES_ZONE_A : 70.8772 ± 2.9019%
+  PARKES_ZONE_B : 26.8421 ± 2.9876%
+  PARKES_AB     : 97.7193 ± 0.5321%
+
+Results saved to ./results/c1s05_raw/evaluation_results.json
+--- Finished successfully in 1.9s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:25:23] Training ST-MGM (M9) for c2s01_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c2s01_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c2s01_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=124.13, std=44.40 mg/dL | pos_weight=4.60 (raw_ratio=21.2)
+  STMGMDataset: 2286 samples (hypo=103, normal=2183, ratio=21.2)
+  STMGMDataset: 572 samples (hypo=26, normal=546, ratio=21.0)
+  Epoch   1/100: train_loss=0.6764 (cls=0.5958, reg=0.7570) | val_loss=0.6480 (reg=0.7525, auc=0.6306)
+  Epoch  10/100: train_loss=0.5053 (cls=0.3979, reg=0.6127) | val_loss=0.6437 (reg=0.7334, auc=0.7094)
+  Epoch  20/100: train_loss=0.3118 (cls=0.1487, reg=0.4750) | val_loss=0.8604 (reg=0.8847, auc=0.6646)
+  Early stopping at epoch 25
+  Saved best model → ./results/c2s01_raw/v1.pt (val_score=0.8357, val_loss=0.5939, train_thr=0.3052)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=124.62, std=45.29 mg/dL | pos_weight=4.60 (raw_ratio=21.2)
+  STMGMDataset: 2286 samples (hypo=103, normal=2183, ratio=21.2)
+  STMGMDataset: 572 samples (hypo=26, normal=546, ratio=21.0)
+  Epoch   1/100: train_loss=0.6479 (cls=0.5448, reg=0.7511) | val_loss=0.5809 (reg=0.6461, auc=0.6855)
+  Epoch  10/100: train_loss=0.5056 (cls=0.3866, reg=0.6246) | val_loss=0.5669 (reg=0.6128, auc=0.7424)
+  Epoch  20/100: train_loss=0.3134 (cls=0.1576, reg=0.4692) | val_loss=0.6934 (reg=0.6726, auc=0.7571)
+  Early stopping at epoch 27
+  Saved best model → ./results/c2s01_raw/v2.pt (val_score=0.7068, val_loss=0.5245, train_thr=0.4296)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=124.60, std=44.44 mg/dL | pos_weight=4.60 (raw_ratio=21.2)
+  STMGMDataset: 2286 samples (hypo=103, normal=2183, ratio=21.2)
+  STMGMDataset: 572 samples (hypo=26, normal=546, ratio=21.0)
+  Epoch   1/100: train_loss=0.6601 (cls=0.5711, reg=0.7491) | val_loss=0.6285 (reg=0.7553, auc=0.7242)
+  Epoch  10/100: train_loss=0.5114 (cls=0.4104, reg=0.6123) | val_loss=0.6394 (reg=0.7434, auc=0.7174)
+  Epoch  20/100: train_loss=0.3065 (cls=0.1445, reg=0.4686) | val_loss=0.7867 (reg=0.8462, auc=0.6972)
+  Early stopping at epoch 27
+  Saved best model → ./results/c2s01_raw/v3.pt (val_score=0.8428, val_loss=0.6000, train_thr=0.3725)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=125.08, std=45.51 mg/dL | pos_weight=4.58 (raw_ratio=21.0)
+  STMGMDataset: 2287 samples (hypo=104, normal=2183, ratio=21.0)
+  STMGMDataset: 571 samples (hypo=25, normal=546, ratio=21.8)
+  Epoch   1/100: train_loss=0.6509 (cls=0.5609, reg=0.7409) | val_loss=0.5744 (reg=0.6214, auc=0.6207)
+  Epoch  10/100: train_loss=0.4999 (cls=0.3886, reg=0.6111) | val_loss=0.5472 (reg=0.5914, auc=0.7106)
+  Epoch  20/100: train_loss=0.3099 (cls=0.1418, reg=0.4779) | val_loss=0.6757 (reg=0.6347, auc=0.6629)
+  Epoch  30/100: train_loss=0.1554 (cls=0.0449, reg=0.2658) | val_loss=0.8616 (reg=0.7019, auc=0.6315)
+  Early stopping at epoch 32
+  Saved best model → ./results/c2s01_raw/v4.pt (val_score=0.7224, val_loss=0.5556, train_thr=0.2472)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=123.89, std=44.54 mg/dL | pos_weight=4.60 (raw_ratio=21.2)
+  STMGMDataset: 2287 samples (hypo=103, normal=2184, ratio=21.2)
+  STMGMDataset: 571 samples (hypo=26, normal=545, ratio=21.0)
+  Epoch   1/100: train_loss=0.6518 (cls=0.5689, reg=0.7346) | val_loss=0.6357 (reg=0.7281, auc=0.6409)
+  Epoch  10/100: train_loss=0.4902 (cls=0.3674, reg=0.6129) | val_loss=0.6607 (reg=0.7411, auc=0.6939)
+  Epoch  20/100: train_loss=0.3089 (cls=0.1512, reg=0.4666) | val_loss=0.7963 (reg=0.7923, auc=0.6796)
+  Epoch  30/100: train_loss=0.1722 (cls=0.0655, reg=0.2790) | val_loss=0.9034 (reg=0.8185, auc=0.7218)
+  Early stopping at epoch 34
+  Saved best model → ./results/c2s01_raw/v5.pt (val_score=0.8417, val_loss=0.6607, train_thr=0.2306)
+
+Training summary saved to ./results/c2s01_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 103.3s ---
+
+>>> [2026-11-12 01:27:06] Evaluating ST-MGM (M9) for c2s01_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c2s01_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c2s01_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.7994, AUPRC=0.1684, F1=0.2737, BalAcc=0.6987, Sens=0.5000, Spec=0.8974, Acc=0.8794
+  Regression:     RMSE=45.83 mg/dL, MAE=33.28 mg/dL, MARD=28.07%, Pearson r=0.2092
+  Parkes Grid:    A+B=91.61% (Zone A=52.45%, Zone B=39.16%)
+  Threshold:      train_eer=0.3052 (val_eer=0.3151)
+
+--- v2 ---
+  Classification: AUC=0.7876, AUPRC=0.1724, F1=0.2812, BalAcc=0.6465, Sens=0.3462, Spec=0.9469, Acc=0.9196
+  Regression:     RMSE=41.96 mg/dL, MAE=30.74 mg/dL, MARD=25.97%, Pearson r=0.2421
+  Parkes Grid:    A+B=94.06% (Zone A=55.94%, Zone B=38.11%)
+  Threshold:      train_eer=0.4296 (val_eer=0.3576)
+
+--- v3 ---
+  Classification: AUC=0.7858, AUPRC=0.1212, F1=0.1856, BalAcc=0.6163, Sens=0.3462, Spec=0.8864, Acc=0.8619
+  Regression:     RMSE=46.05 mg/dL, MAE=33.40 mg/dL, MARD=28.46%, Pearson r=0.1885
+  Parkes Grid:    A+B=92.66% (Zone A=51.40%, Zone B=41.26%)
+  Threshold:      train_eer=0.3725 (val_eer=0.3799)
+
+--- v4 ---
+  Classification: AUC=0.6919, AUPRC=0.2479, F1=0.2162, BalAcc=0.6225, Sens=0.3200, Spec=0.9249, Acc=0.8984
+  Regression:     RMSE=40.81 mg/dL, MAE=30.50 mg/dL, MARD=25.99%, Pearson r=0.2521
+  Parkes Grid:    A+B=93.52% (Zone A=56.22%, Zone B=37.30%)
+  Threshold:      train_eer=0.2472 (val_eer=0.3588)
+
+--- v5 ---
+  Classification: AUC=0.7195, AUPRC=0.1283, F1=0.1395, BalAcc=0.5448, Sens=0.1154, Spec=0.9743, Acc=0.9352
+  Regression:     RMSE=44.74 mg/dL, MAE=33.04 mg/dL, MARD=27.20%, Pearson r=0.2514
+  Parkes Grid:    A+B=92.12% (Zone A=51.66%, Zone B=40.46%)
+  Threshold:      train_eer=0.2306 (val_eer=0.2947)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7569 ± 0.0429
+  AUPRC         : 0.1676 ± 0.0451
+  F1            : 0.2193 ± 0.0535
+  BALANCED_ACC  : 0.6258 ± 0.0498
+  SENSITIVITY   : 0.3255 ± 0.1229
+  SPECIFICITY   : 0.9260 ± 0.0321
+  ACC           : 0.8989 ± 0.0264
+  RMSE          : 43.8762 ± 2.1165 mg/dL
+  MAE           : 32.1922 ± 1.2896 mg/dL
+  MARD          : 27.1370 ± 1.0284%
+  PEARSON_R     : 0.2287 ± 0.0254
+  PARKES_ZONE_A : 53.5342 ± 2.1093%
+  PARKES_ZONE_B : 39.2580 ± 1.4548%
+  PARKES_AB     : 92.7922 ± 0.8944%
+
+Results saved to ./results/c2s01_raw/evaluation_results.json
+--- Finished successfully in 2.0s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:27:38] Training ST-MGM (M9) for c2s02_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c2s02_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c2s02_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=109.23, std=30.91 mg/dL | pos_weight=3.88 (raw_ratio=15.0)
+  STMGMDataset: 1990 samples (hypo=124, normal=1866, ratio=15.0)
+  STMGMDataset: 498 samples (hypo=31, normal=467, ratio=15.1)
+  Epoch   1/100: train_loss=0.6710 (cls=0.6339, reg=0.7082) | val_loss=0.5736 (reg=0.6386, auc=0.7881)
+  Epoch  10/100: train_loss=0.4152 (cls=0.3198, reg=0.5105) | val_loss=0.5086 (reg=0.5312, auc=0.8145)
+  Epoch  20/100: train_loss=0.2371 (cls=0.1183, reg=0.3559) | val_loss=0.5883 (reg=0.5744, auc=0.8170)
+  Epoch  30/100: train_loss=0.1125 (cls=0.0316, reg=0.1935) | val_loss=0.7468 (reg=0.6039, auc=0.8461)
+  Early stopping at epoch 39
+  Saved best model → ./results/c2s02_raw/v1.pt (val_score=0.5715, val_loss=0.4979, train_thr=0.4846)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=108.97, std=30.71 mg/dL | pos_weight=3.88 (raw_ratio=15.0)
+  STMGMDataset: 1990 samples (hypo=124, normal=1866, ratio=15.0)
+  STMGMDataset: 498 samples (hypo=31, normal=467, ratio=15.1)
+  Epoch   1/100: train_loss=0.6664 (cls=0.5808, reg=0.7520) | val_loss=0.6143 (reg=0.7058, auc=0.7353)
+  Epoch  10/100: train_loss=0.4038 (cls=0.3012, reg=0.5064) | val_loss=0.5976 (reg=0.6498, auc=0.7810)
+  Epoch  20/100: train_loss=0.2342 (cls=0.1399, reg=0.3285) | val_loss=0.6517 (reg=0.6486, auc=0.8094)
+  Early stopping at epoch 26
+  Saved best model → ./results/c2s02_raw/v2.pt (val_score=0.7383, val_loss=0.5789, train_thr=0.3308)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=109.13, std=31.40 mg/dL | pos_weight=3.88 (raw_ratio=15.0)
+  STMGMDataset: 1990 samples (hypo=124, normal=1866, ratio=15.0)
+  STMGMDataset: 498 samples (hypo=31, normal=467, ratio=15.1)
+  Epoch   1/100: train_loss=0.6654 (cls=0.5986, reg=0.7321) | val_loss=0.5527 (reg=0.5717, auc=0.7139)
+  Epoch  10/100: train_loss=0.4357 (cls=0.3643, reg=0.5071) | val_loss=0.5217 (reg=0.5669, auc=0.8129)
+  Epoch  20/100: train_loss=0.2490 (cls=0.1489, reg=0.3490) | val_loss=0.6143 (reg=0.5320, auc=0.7333)
+  Early stopping at epoch 28
+  Saved best model → ./results/c2s02_raw/v3.pt (val_score=0.6239, val_loss=0.4971, train_thr=0.3776)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=108.61, std=30.47 mg/dL | pos_weight=3.88 (raw_ratio=15.1)
+  STMGMDataset: 1991 samples (hypo=124, normal=1867, ratio=15.1)
+  STMGMDataset: 497 samples (hypo=31, normal=466, ratio=15.0)
+  Epoch   1/100: train_loss=0.6675 (cls=0.6151, reg=0.7199) | val_loss=0.6506 (reg=0.7395, auc=0.6848)
+  Epoch  10/100: train_loss=0.3836 (cls=0.2702, reg=0.4970) | val_loss=0.6360 (reg=0.6702, auc=0.7390)
+  Epoch  20/100: train_loss=0.2312 (cls=0.1024, reg=0.3600) | val_loss=0.7716 (reg=0.6886, auc=0.7100)
+  Early stopping at epoch 27
+  Saved best model → ./results/c2s02_raw/v4.pt (val_score=0.7927, val_loss=0.6168, train_thr=0.5179)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=109.17, std=31.14 mg/dL | pos_weight=3.88 (raw_ratio=15.1)
+  STMGMDataset: 1991 samples (hypo=124, normal=1867, ratio=15.1)
+  STMGMDataset: 497 samples (hypo=31, normal=466, ratio=15.0)
+  Epoch   1/100: train_loss=0.6767 (cls=0.6371, reg=0.7164) | val_loss=0.6029 (reg=0.6361, auc=0.6558)
+  Epoch  10/100: train_loss=0.3722 (cls=0.2719, reg=0.4725) | val_loss=0.6234 (reg=0.6552, auc=0.7616)
+  Epoch  20/100: train_loss=0.2150 (cls=0.1133, reg=0.3167) | val_loss=0.6270 (reg=0.5700, auc=0.7781)
+  Epoch  30/100: train_loss=0.1234 (cls=0.0389, reg=0.2079) | val_loss=0.8254 (reg=0.6431, auc=0.7134)
+  Early stopping at epoch 36
+  Saved best model → ./results/c2s02_raw/v5.pt (val_score=0.6583, val_loss=0.5772, train_thr=0.4552)
+
+Training summary saved to ./results/c2s02_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 96.6s ---
+
+>>> [2026-11-12 01:29:15] Evaluating ST-MGM (M9) for c2s02_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c2s02_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c2s02_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.8788, AUPRC=0.5382, F1=0.5357, BalAcc=0.7312, Sens=0.4839, Spec=0.9786, Acc=0.9478
+  Regression:     RMSE=26.27 mg/dL, MAE=19.53 mg/dL, MARD=19.23%, Pearson r=0.5382
+  Parkes Grid:    A+B=96.99% (Zone A=72.89%, Zone B=24.10%)
+  Threshold:      train_eer=0.4846 (val_eer=0.2813)
+
+--- v2 ---
+  Classification: AUC=0.8026, AUPRC=0.3132, F1=0.2188, BalAcc=0.5851, Sens=0.2258, Spec=0.9443, Acc=0.8996
+  Regression:     RMSE=29.27 mg/dL, MAE=21.91 mg/dL, MARD=21.54%, Pearson r=0.3973
+  Parkes Grid:    A+B=95.38% (Zone A=63.65%, Zone B=31.73%)
+  Threshold:      train_eer=0.3308 (val_eer=0.2535)
+
+--- v3 ---
+  Classification: AUC=0.8058, AUPRC=0.3586, F1=0.3421, BalAcc=0.6754, Sens=0.4194, Spec=0.9315, Acc=0.8996
+  Regression:     RMSE=27.02 mg/dL, MAE=20.52 mg/dL, MARD=20.08%, Pearson r=0.3831
+  Parkes Grid:    A+B=96.59% (Zone A=70.08%, Zone B=26.51%)
+  Threshold:      train_eer=0.3776 (val_eer=0.3122)
+
+--- v4 ---
+  Classification: AUC=0.7153, AUPRC=0.3564, F1=0.2951, BalAcc=0.6226, Sens=0.2903, Spec=0.9549, Acc=0.9135
+  Regression:     RMSE=29.33 mg/dL, MAE=21.74 mg/dL, MARD=20.32%, Pearson r=0.4517
+  Parkes Grid:    A+B=96.38% (Zone A=67.00%, Zone B=29.38%)
+  Threshold:      train_eer=0.5179 (val_eer=0.4582)
+
+--- v5 ---
+  Classification: AUC=0.7918, AUPRC=0.4343, F1=0.3846, BalAcc=0.6495, Sens=0.3226, Spec=0.9764, Acc=0.9356
+  Regression:     RMSE=27.55 mg/dL, MAE=20.36 mg/dL, MARD=20.07%, Pearson r=0.4175
+  Parkes Grid:    A+B=95.57% (Zone A=70.22%, Zone B=25.35%)
+  Threshold:      train_eer=0.4552 (val_eer=0.2521)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7989 ± 0.0519
+  AUPRC         : 0.4001 ± 0.0793
+  F1            : 0.3553 ± 0.1057
+  BALANCED_ACC  : 0.6528 ± 0.0493
+  SENSITIVITY   : 0.3484 ± 0.0921
+  SPECIFICITY   : 0.9571 ± 0.0182
+  ACC           : 0.9192 ± 0.0194
+  RMSE          : 27.8908 ± 1.2230 mg/dL
+  MAE           : 20.8136 ± 0.8950 mg/dL
+  MARD          : 20.2480 ± 0.7440%
+  PEARSON_R     : 0.4375 ± 0.0553
+  PARKES_ZONE_A : 68.7700 ± 3.1655%
+  PARKES_ZONE_B : 27.4115 ± 2.7761%
+  PARKES_AB     : 96.1815 ± 0.6104%
+
+Results saved to ./results/c2s02_raw/evaluation_results.json
+--- Finished successfully in 2.0s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:29:47] Training ST-MGM (M9) for c2s03_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c2s03_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c2s03_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=135.79, std=38.98 mg/dL | pos_weight=6.70 (raw_ratio=44.9)
+  STMGMDataset: 1792 samples (hypo=39, normal=1753, ratio=44.9)
+  STMGMDataset: 448 samples (hypo=9, normal=439, ratio=48.8)
+  Epoch   1/100: train_loss=0.6146 (cls=0.4761, reg=0.7532) | val_loss=0.5403 (reg=0.6978, auc=0.7211)
+  Epoch  10/100: train_loss=0.4197 (cls=0.2808, reg=0.5585) | val_loss=0.5444 (reg=0.6431, auc=0.6808)
+  Epoch  20/100: train_loss=0.2123 (cls=0.0780, reg=0.3466) | val_loss=0.6988 (reg=0.7351, auc=0.6209)
+  Early stopping at epoch 25
+  Saved best model → ./results/c2s03_raw/v1.pt (val_score=0.7384, val_loss=0.4969, train_thr=0.2001)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=135.96, std=38.42 mg/dL | pos_weight=6.70 (raw_ratio=44.9)
+  STMGMDataset: 1792 samples (hypo=39, normal=1753, ratio=44.9)
+  STMGMDataset: 448 samples (hypo=9, normal=439, ratio=48.8)
+  Epoch   1/100: train_loss=0.6181 (cls=0.4686, reg=0.7677) | val_loss=0.5810 (reg=0.7434, auc=0.4903)
+  Epoch  10/100: train_loss=0.4300 (cls=0.2925, reg=0.5676) | val_loss=0.5435 (reg=0.6509, auc=0.6783)
+  Epoch  20/100: train_loss=0.2687 (cls=0.1212, reg=0.4161) | val_loss=0.6747 (reg=0.7732, auc=0.5907)
+  Early stopping at epoch 28
+  Saved best model → ./results/c2s03_raw/v2.pt (val_score=0.8025, val_loss=0.5405, train_thr=0.2747)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=135.56, std=38.47 mg/dL | pos_weight=6.79 (raw_ratio=46.2)
+  STMGMDataset: 1792 samples (hypo=38, normal=1754, ratio=46.2)
+  STMGMDataset: 448 samples (hypo=10, normal=438, ratio=43.8)
+  Epoch   1/100: train_loss=0.6101 (cls=0.4619, reg=0.7584) | val_loss=0.5926 (reg=0.7470, auc=0.6797)
+  Epoch  10/100: train_loss=0.4129 (cls=0.2785, reg=0.5472) | val_loss=0.5956 (reg=0.7158, auc=0.6687)
+  Epoch  20/100: train_loss=0.1853 (cls=0.0714, reg=0.2992) | val_loss=0.7360 (reg=0.8558, auc=0.7007)
+  Early stopping at epoch 25
+  Saved best model → ./results/c2s03_raw/v3.pt (val_score=0.8032, val_loss=0.5383, train_thr=0.2263)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=135.64, std=38.71 mg/dL | pos_weight=6.79 (raw_ratio=46.2)
+  STMGMDataset: 1792 samples (hypo=38, normal=1754, ratio=46.2)
+  STMGMDataset: 448 samples (hypo=10, normal=438, ratio=43.8)
+  Epoch   1/100: train_loss=0.6263 (cls=0.4812, reg=0.7714) | val_loss=0.5410 (reg=0.6349, auc=0.6390)
+  Epoch  10/100: train_loss=0.4345 (cls=0.3102, reg=0.5589) | val_loss=0.5612 (reg=0.6080, auc=0.6607)
+  Epoch  20/100: train_loss=0.2349 (cls=0.1100, reg=0.3598) | val_loss=0.7246 (reg=0.7442, auc=0.6048)
+  Early stopping at epoch 29
+  Saved best model → ./results/c2s03_raw/v4.pt (val_score=0.7129, val_loss=0.5103, train_thr=0.2276)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=135.98, std=38.50 mg/dL | pos_weight=6.79 (raw_ratio=46.2)
+  STMGMDataset: 1792 samples (hypo=38, normal=1754, ratio=46.2)
+  STMGMDataset: 448 samples (hypo=10, normal=438, ratio=43.8)
+  Epoch   1/100: train_loss=0.6357 (cls=0.4868, reg=0.7846) | val_loss=0.5636 (reg=0.6872, auc=0.6203)
+  Epoch  10/100: train_loss=0.4032 (cls=0.2632, reg=0.5432) | val_loss=0.5403 (reg=0.6456, auc=0.7126)
+  Epoch  20/100: train_loss=0.2027 (cls=0.0558, reg=0.3497) | val_loss=0.6217 (reg=0.7325, auc=0.7968)
+  Early stopping at epoch 28
+  Saved best model → ./results/c2s03_raw/v5.pt (val_score=0.7772, val_loss=0.5296, train_thr=0.2539)
+
+Training summary saved to ./results/c2s03_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 76.8s ---
+
+>>> [2026-11-12 01:31:04] Evaluating ST-MGM (M9) for c2s03_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c2s03_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c2s03_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.7583, AUPRC=0.0573, F1=0.0909, BalAcc=0.5419, Sens=0.1111, Spec=0.9727, Acc=0.9554
+  Regression:     RMSE=36.22 mg/dL, MAE=28.43 mg/dL, MARD=22.82%, Pearson r=0.2801
+  Parkes Grid:    A+B=95.76% (Zone A=52.23%, Zone B=43.53%)
+  Threshold:      train_eer=0.2001 (val_eer=0.2059)
+
+--- v2 ---
+  Classification: AUC=0.7284, AUPRC=0.0433, F1=0.0000, BalAcc=0.4692, Sens=0.0000, Spec=0.9385, Acc=0.9196
+  Regression:     RMSE=37.32 mg/dL, MAE=29.15 mg/dL, MARD=23.59%, Pearson r=0.3433
+  Parkes Grid:    A+B=95.76% (Zone A=54.24%, Zone B=41.52%)
+  Threshold:      train_eer=0.2747 (val_eer=0.2725)
+
+--- v3 ---
+  Classification: AUC=0.7600, AUPRC=0.1043, F1=0.2500, BalAcc=0.7215, Sens=0.5000, Spec=0.9429, Acc=0.9330
+  Regression:     RMSE=37.69 mg/dL, MAE=30.11 mg/dL, MARD=24.35%, Pearson r=0.2849
+  Parkes Grid:    A+B=96.21% (Zone A=50.67%, Zone B=45.54%)
+  Threshold:      train_eer=0.2263 (val_eer=0.2336)
+
+--- v4 ---
+  Classification: AUC=0.7667, AUPRC=0.1045, F1=0.1429, BalAcc=0.5817, Sens=0.2000, Spec=0.9635, Acc=0.9464
+  Regression:     RMSE=35.24 mg/dL, MAE=28.09 mg/dL, MARD=22.26%, Pearson r=0.4088
+  Parkes Grid:    A+B=96.21% (Zone A=54.91%, Zone B=41.29%)
+  Threshold:      train_eer=0.2276 (val_eer=0.3510)
+
+--- v5 ---
+  Classification: AUC=0.7315, AUPRC=0.1593, F1=0.1333, BalAcc=0.6135, Sens=0.3000, Spec=0.9269, Acc=0.9129
+  Regression:     RMSE=36.61 mg/dL, MAE=28.62 mg/dL, MARD=22.98%, Pearson r=0.3635
+  Parkes Grid:    A+B=95.09% (Zone A=55.36%, Zone B=39.73%)
+  Threshold:      train_eer=0.2539 (val_eer=0.2502)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7490 ± 0.0158
+  AUPRC         : 0.0938 ± 0.0410
+  F1            : 0.1234 ± 0.0810
+  BALANCED_ACC  : 0.5856 ± 0.0833
+  SENSITIVITY   : 0.2222 ± 0.1705
+  SPECIFICITY   : 0.9489 ± 0.0168
+  ACC           : 0.9335 ± 0.0159
+  RMSE          : 36.6159 ± 0.8611 mg/dL
+  MAE           : 28.8783 ± 0.7058 mg/dL
+  MARD          : 23.1993 ± 0.7126%
+  PEARSON_R     : 0.3361 ± 0.0487
+  PARKES_ZONE_A : 53.4821 ± 1.7666%
+  PARKES_ZONE_B : 42.3214 ± 2.0094%
+  PARKES_AB     : 95.8036 ± 0.4092%
+
+Results saved to ./results/c2s03_raw/evaluation_results.json
+--- Finished successfully in 1.8s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:31:35] Training ST-MGM (M9) for c2s04_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c2s04_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c2s04_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=134.97, std=42.65 mg/dL | pos_weight=5.92 (raw_ratio=35.1)
+  STMGMDataset: 2598 samples (hypo=72, normal=2526, ratio=35.1)
+  STMGMDataset: 650 samples (hypo=18, normal=632, ratio=35.1)
+  Epoch   1/100: train_loss=0.5919 (cls=0.4909, reg=0.6929) | val_loss=0.5464 (reg=0.6758, auc=0.7626)
+  Epoch  10/100: train_loss=0.4403 (cls=0.2927, reg=0.5880) | val_loss=0.5654 (reg=0.6868, auc=0.7702)
+  Epoch  20/100: train_loss=0.2392 (cls=0.0919, reg=0.3865) | val_loss=0.6714 (reg=0.7429, auc=0.7679)
+  Early stopping at epoch 26
+  Saved best model → ./results/c2s04_raw/v1.pt (val_score=0.7821, val_loss=0.5364, train_thr=0.2269)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=136.38, std=43.02 mg/dL | pos_weight=5.92 (raw_ratio=35.1)
+  STMGMDataset: 2598 samples (hypo=72, normal=2526, ratio=35.1)
+  STMGMDataset: 650 samples (hypo=18, normal=632, ratio=35.1)
+  Epoch   1/100: train_loss=0.5989 (cls=0.4910, reg=0.7068) | val_loss=0.5272 (reg=0.6321, auc=0.7359)
+  Epoch  10/100: train_loss=0.4535 (cls=0.3269, reg=0.5802) | val_loss=0.5199 (reg=0.6033, auc=0.7634)
+  Epoch  20/100: train_loss=0.2764 (cls=0.0965, reg=0.4564) | val_loss=0.6524 (reg=0.6691, auc=0.7295)
+  Epoch  30/100: train_loss=0.1655 (cls=0.0388, reg=0.2922) | val_loss=0.7807 (reg=0.7732, auc=0.7602)
+  Early stopping at epoch 35
+  Saved best model → ./results/c2s04_raw/v2.pt (val_score=0.7115, val_loss=0.5371, train_thr=0.2135)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=135.91, std=42.78 mg/dL | pos_weight=5.92 (raw_ratio=35.1)
+  STMGMDataset: 2598 samples (hypo=72, normal=2526, ratio=35.1)
+  STMGMDataset: 650 samples (hypo=18, normal=632, ratio=35.1)
+  Epoch   1/100: train_loss=0.5934 (cls=0.4774, reg=0.7095) | val_loss=0.5513 (reg=0.6804, auc=0.7072)
+  Epoch  10/100: train_loss=0.4413 (cls=0.2934, reg=0.5891) | val_loss=0.5917 (reg=0.6587, auc=0.7177)
+  Epoch  20/100: train_loss=0.2617 (cls=0.1217, reg=0.4017) | val_loss=0.6487 (reg=0.7091, auc=0.7136)
+  Early stopping at epoch 26
+  Saved best model → ./results/c2s04_raw/v3.pt (val_score=0.7767, val_loss=0.5377, train_thr=0.2105)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=135.97, std=42.88 mg/dL | pos_weight=5.92 (raw_ratio=35.1)
+  STMGMDataset: 2599 samples (hypo=72, normal=2527, ratio=35.1)
+  STMGMDataset: 649 samples (hypo=18, normal=631, ratio=35.1)
+  Epoch   1/100: train_loss=0.5936 (cls=0.4614, reg=0.7259) | val_loss=0.5666 (reg=0.6588, auc=0.6292)
+  Epoch  10/100: train_loss=0.4591 (cls=0.3175, reg=0.6006) | val_loss=0.5908 (reg=0.6731, auc=0.6959)
+  Epoch  20/100: train_loss=0.2957 (cls=0.1330, reg=0.4585) | val_loss=0.6775 (reg=0.7062, auc=0.7102)
+  Epoch  30/100: train_loss=0.1655 (cls=0.0547, reg=0.2764) | val_loss=0.8078 (reg=0.7857, auc=0.7299)
+  Early stopping at epoch 34
+  Saved best model → ./results/c2s04_raw/v4.pt (val_score=0.7784, val_loss=0.5793, train_thr=0.3779)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=135.60, std=42.83 mg/dL | pos_weight=5.92 (raw_ratio=35.1)
+  STMGMDataset: 2599 samples (hypo=72, normal=2527, ratio=35.1)
+  STMGMDataset: 649 samples (hypo=18, normal=631, ratio=35.1)
+  Epoch   1/100: train_loss=0.5989 (cls=0.4965, reg=0.7013) | val_loss=0.5450 (reg=0.6736, auc=0.7620)
+  Epoch  10/100: train_loss=0.4310 (cls=0.2811, reg=0.5810) | val_loss=0.5101 (reg=0.6152, auc=0.8339)
+  Epoch  20/100: train_loss=0.2539 (cls=0.0854, reg=0.4223) | val_loss=0.6194 (reg=0.6455, auc=0.8229)
+  Epoch  30/100: train_loss=0.1371 (cls=0.0341, reg=0.2400) | val_loss=0.7282 (reg=0.7054, auc=0.7761)
+  Early stopping at epoch 30
+  Saved best model → ./results/c2s04_raw/v5.pt (val_score=0.6982, val_loss=0.5101, train_thr=0.2175)
+
+Training summary saved to ./results/c2s04_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 120.6s ---
+
+>>> [2026-11-12 01:33:36] Evaluating ST-MGM (M9) for c2s04_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c2s04_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c2s04_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.7857, AUPRC=0.1848, F1=0.2151, BalAcc=0.7264, Sens=0.5556, Spec=0.8972, Acc=0.8877
+  Regression:     RMSE=41.69 mg/dL, MAE=32.37 mg/dL, MARD=25.37%, Pearson r=0.2868
+  Parkes Grid:    A+B=95.08% (Zone A=49.54%, Zone B=45.54%)
+  Threshold:      train_eer=0.2269 (val_eer=0.2246)
+
+--- v2 ---
+  Classification: AUC=0.8098, AUPRC=0.1760, F1=0.2273, BalAcc=0.6223, Sens=0.2778, Spec=0.9668, Acc=0.9477
+  Regression:     RMSE=40.25 mg/dL, MAE=30.63 mg/dL, MARD=24.20%, Pearson r=0.3085
+  Parkes Grid:    A+B=94.62% (Zone A=53.69%, Zone B=40.92%)
+  Threshold:      train_eer=0.2135 (val_eer=0.2076)
+
+--- v3 ---
+  Classification: AUC=0.7293, AUPRC=0.1241, F1=0.1562, BalAcc=0.6065, Sens=0.2778, Spec=0.9351, Acc=0.9169
+  Regression:     RMSE=40.88 mg/dL, MAE=30.89 mg/dL, MARD=25.28%, Pearson r=0.3171
+  Parkes Grid:    A+B=94.31% (Zone A=53.69%, Zone B=40.62%)
+  Threshold:      train_eer=0.2105 (val_eer=0.2075)
+
+--- v4 ---
+  Classification: AUC=0.7506, AUPRC=0.0710, F1=0.0455, BalAcc=0.5080, Sens=0.0556, Spec=0.9604, Acc=0.9353
+  Regression:     RMSE=41.53 mg/dL, MAE=30.82 mg/dL, MARD=24.02%, Pearson r=0.2831
+  Parkes Grid:    A+B=95.07% (Zone A=55.32%, Zone B=39.75%)
+  Threshold:      train_eer=0.3779 (val_eer=0.2278)
+
+--- v5 ---
+  Classification: AUC=0.8339, AUPRC=0.1780, F1=0.2000, BalAcc=0.6175, Sens=0.2778, Spec=0.9572, Acc=0.9384
+  Regression:     RMSE=40.03 mg/dL, MAE=30.48 mg/dL, MARD=24.05%, Pearson r=0.3644
+  Parkes Grid:    A+B=94.45% (Zone A=54.85%, Zone B=39.60%)
+  Threshold:      train_eer=0.2175 (val_eer=0.2180)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.7818 ± 0.0381
+  AUPRC         : 0.1468 ± 0.0437
+  F1            : 0.1688 ± 0.0662
+  BALANCED_ACC  : 0.6161 ± 0.0693
+  SENSITIVITY   : 0.2889 ± 0.1587
+  SPECIFICITY   : 0.9433 ± 0.0254
+  ACC           : 0.9252 ± 0.0212
+  RMSE          : 40.8741 ± 0.6626 mg/dL
+  MAE           : 31.0384 ± 0.6824 mg/dL
+  MARD          : 24.5849 ± 0.6102%
+  PEARSON_R     : 0.3120 ± 0.0292
+  PARKES_ZONE_A : 53.4185 ± 2.0428%
+  PARKES_ZONE_B : 41.2860 ± 2.1844%
+  PARKES_AB     : 94.7045 ± 0.3164%
+
+Results saved to ./results/c2s04_raw/evaluation_results.json
+--- Finished successfully in 1.9s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+>>> [2026-11-12 01:34:08] Training ST-MGM (M9) for c2s05_raw
+    CMD: /home/coder/physio-stf/venv/bin/python train.py --subject c2s05_raw --variant M9
+
+Using device: cuda
+
+Training ST-MGM (e2e, variant=M9, task_mode=multitask) for c2s05_raw
+  Target selected features: 18, Folds: ['v1', 'v2', 'v3', 'v4', 'v5']
+  LR: 0.0005, Batch: 32, Epochs: 100, Patience: 20
+  Loss weights: alpha=0.5 (BCEWithLogits), beta=0.5 (MSE/Huber), grad_clip=1.0
+
+==================================================
+  Fold v1
+==================================================
+  Train glucose: mean=109.91, std=35.93 mg/dL | pos_weight=3.95 (raw_ratio=15.6)
+  STMGMDataset: 2518 samples (hypo=152, normal=2366, ratio=15.6)
+  STMGMDataset: 630 samples (hypo=38, normal=592, ratio=15.6)
+  Epoch   1/100: train_loss=0.7124 (cls=0.6780, reg=0.7467) | val_loss=0.6173 (reg=0.6298, auc=0.5320)
+  Epoch  10/100: train_loss=0.5426 (cls=0.4849, reg=0.6003) | val_loss=0.6354 (reg=0.6088, auc=0.5625)
+  Epoch  20/100: train_loss=0.3704 (cls=0.2762, reg=0.4647) | val_loss=0.7858 (reg=0.6928, auc=0.5052)
+  Early stopping at epoch 25
+  Saved best model → ./results/c2s05_raw/v1.pt (val_score=0.8034, val_loss=0.5954, train_thr=0.3068)
+
+==================================================
+  Fold v2
+==================================================
+  Train glucose: mean=109.85, std=35.58 mg/dL | pos_weight=3.95 (raw_ratio=15.6)
+  STMGMDataset: 2518 samples (hypo=152, normal=2366, ratio=15.6)
+  STMGMDataset: 630 samples (hypo=38, normal=592, ratio=15.6)
+  Epoch   1/100: train_loss=0.6710 (cls=0.6247, reg=0.7174) | val_loss=0.6281 (reg=0.6496, auc=0.5473)
+  Epoch  10/100: train_loss=0.5465 (cls=0.4855, reg=0.6075) | val_loss=0.6360 (reg=0.6503, auc=0.5930)
+  Epoch  20/100: train_loss=0.3310 (cls=0.2405, reg=0.4215) | val_loss=0.7831 (reg=0.7715, auc=0.5938)
+  Epoch  30/100: train_loss=0.1917 (cls=0.0922, reg=0.2913) | val_loss=0.9693 (reg=0.8057, auc=0.6350)
+  Early stopping at epoch 32
+  Saved best model → ./results/c2s05_raw/v2.pt (val_score=0.8055, val_loss=0.6219, train_thr=0.2528)
+
+==================================================
+  Fold v3
+==================================================
+  Train glucose: mean=109.50, std=34.85 mg/dL | pos_weight=3.95 (raw_ratio=15.6)
+  STMGMDataset: 2518 samples (hypo=152, normal=2366, ratio=15.6)
+  STMGMDataset: 630 samples (hypo=38, normal=592, ratio=15.6)
+  Epoch   1/100: train_loss=0.6954 (cls=0.6536, reg=0.7372) | val_loss=0.7091 (reg=0.7993, auc=0.4936)
+  Epoch  10/100: train_loss=0.5629 (cls=0.5161, reg=0.6096) | val_loss=0.7328 (reg=0.7902, auc=0.5514)
+  Epoch  20/100: train_loss=0.4095 (cls=0.3358, reg=0.4831) | val_loss=0.8110 (reg=0.8215, auc=0.5400)
+  Epoch  30/100: train_loss=0.2271 (cls=0.1219, reg=0.3323) | val_loss=0.9957 (reg=0.8858, auc=0.5386)
+  Early stopping at epoch 31
+  Saved best model → ./results/c2s05_raw/v3.pt (val_score=0.9818, val_loss=0.7007, train_thr=0.3088)
+
+==================================================
+  Fold v4
+==================================================
+  Train glucose: mean=110.01, std=36.14 mg/dL | pos_weight=3.95 (raw_ratio=15.6)
+  STMGMDataset: 2519 samples (hypo=152, normal=2367, ratio=15.6)
+  STMGMDataset: 629 samples (hypo=38, normal=591, ratio=15.6)
+  Epoch   1/100: train_loss=0.6874 (cls=0.6394, reg=0.7354) | val_loss=0.5871 (reg=0.5751, auc=0.5361)
+  Epoch  10/100: train_loss=0.5622 (cls=0.5131, reg=0.6114) | val_loss=0.5786 (reg=0.5534, auc=0.6062)
+  Epoch  20/100: train_loss=0.3621 (cls=0.2553, reg=0.4690) | val_loss=0.6954 (reg=0.6001, auc=0.6123)
+  Early stopping at epoch 29
+  Saved best model → ./results/c2s05_raw/v4.pt (val_score=0.7330, val_loss=0.5666, train_thr=0.2829)
+
+==================================================
+  Fold v5
+==================================================
+  Train glucose: mean=109.47, std=35.21 mg/dL | pos_weight=3.95 (raw_ratio=15.6)
+  STMGMDataset: 2519 samples (hypo=152, normal=2367, ratio=15.6)
+  STMGMDataset: 629 samples (hypo=38, normal=591, ratio=15.6)
+  Epoch   1/100: train_loss=0.6929 (cls=0.6688, reg=0.7170) | val_loss=0.6726 (reg=0.7130, auc=0.4402)
+  Epoch  10/100: train_loss=0.5548 (cls=0.5049, reg=0.6047) | val_loss=0.6630 (reg=0.7077, auc=0.5925)
+  Epoch  20/100: train_loss=0.3788 (cls=0.2654, reg=0.4923) | val_loss=0.8117 (reg=0.8138, auc=0.5530)
+  Epoch  30/100: train_loss=0.2581 (cls=0.1375, reg=0.3787) | val_loss=0.8612 (reg=0.7792, auc=0.6022)
+  Early stopping at epoch 32
+  Saved best model → ./results/c2s05_raw/v5.pt (val_score=0.8849, val_loss=0.6726, train_thr=0.2738)
+
+Training summary saved to ./results/c2s05_raw/training_summary.json
+
+Training complete!
+--- Finished successfully in 117.8s ---
+
+>>> [2026-11-12 01:36:06] Evaluating ST-MGM (M9) for c2s05_raw
+    CMD: /home/coder/physio-stf/venv/bin/python test.py --subject c2s05_raw --variant M9
+
+Using device: cuda
+
+============================================================
+  ST-MGM Evaluation: c2s05_raw
+============================================================
+
+--- v1 ---
+  Classification: AUC=0.6323, AUPRC=0.1018, F1=0.1778, BalAcc=0.5861, Sens=0.3158, Spec=0.8564, Acc=0.8238
+  Regression:     RMSE=33.96 mg/dL, MAE=25.10 mg/dL, MARD=23.65%, Pearson r=0.1224
+  Parkes Grid:    A+B=94.44% (Zone A=58.89%, Zone B=35.56%)
+  Threshold:      train_eer=0.3068 (val_eer=0.3170)
+
+--- v2 ---
+  Classification: AUC=0.6623, AUPRC=0.1378, F1=0.2034, BalAcc=0.6005, Sens=0.3158, Spec=0.8851, Acc=0.8508
+  Regression:     RMSE=33.84 mg/dL, MAE=25.64 mg/dL, MARD=25.01%, Pearson r=0.3213
+  Parkes Grid:    A+B=93.49% (Zone A=58.57%, Zone B=34.92%)
+  Threshold:      train_eer=0.2528 (val_eer=0.3058)
+
+--- v3 ---
+  Classification: AUC=0.5895, AUPRC=0.1006, F1=0.1374, BalAcc=0.5475, Sens=0.2368, Spec=0.8581, Acc=0.8206
+  Regression:     RMSE=37.44 mg/dL, MAE=25.83 mg/dL, MARD=24.00%, Pearson r=0.2226
+  Parkes Grid:    A+B=93.17% (Zone A=62.54%, Zone B=30.63%)
+  Threshold:      train_eer=0.3088 (val_eer=0.3250)
+
+--- v4 ---
+  Classification: AUC=0.6513, AUPRC=0.1238, F1=0.1667, BalAcc=0.5707, Sens=0.2632, Spec=0.8782, Acc=0.8410
+  Regression:     RMSE=32.27 mg/dL, MAE=23.73 mg/dL, MARD=23.17%, Pearson r=0.2319
+  Parkes Grid:    A+B=93.16% (Zone A=61.84%, Zone B=31.32%)
+  Threshold:      train_eer=0.2829 (val_eer=0.2784)
+
+--- v5 ---
+  Classification: AUC=0.6288, AUPRC=0.1124, F1=0.1452, BalAcc=0.5533, Sens=0.2368, Spec=0.8697, Acc=0.8315
+  Regression:     RMSE=35.61 mg/dL, MAE=25.38 mg/dL, MARD=23.62%, Pearson r=0.2717
+  Parkes Grid:    A+B=93.16% (Zone A=62.16%, Zone B=31.00%)
+  Threshold:      train_eer=0.2738 (val_eer=0.3437)
+
+============================================================
+  Average Results (5 folds)
+============================================================
+  AUC           : 0.6328 ± 0.0249
+  AUPRC         : 0.1153 ± 0.0141
+  F1            : 0.1661 ± 0.0236
+  BALANCED_ACC  : 0.5716 ± 0.0198
+  SENSITIVITY   : 0.2737 ± 0.0357
+  SPECIFICITY   : 0.8695 ± 0.0111
+  ACC           : 0.8335 ± 0.0111
+  RMSE          : 34.6222 ± 1.7602 mg/dL
+  MAE           : 25.1359 ± 0.7435 mg/dL
+  MARD          : 23.8893 ± 0.6178%
+  PEARSON_R     : 0.2340 ± 0.0658
+  PARKES_ZONE_A : 60.8013 ± 1.7083%
+  PARKES_ZONE_B : 32.6865 ± 2.1042%
+  PARKES_AB     : 93.4877 ± 0.4946%
+
+Results saved to ./results/c2s05_raw/evaluation_results.json
+--- Finished successfully in 2.0s ---
+    [Cooldown] Pausing 30s for GPU cooling and cache flush...
+
+========================================================
+  All requested experiments completed successfully!
+========================================================
