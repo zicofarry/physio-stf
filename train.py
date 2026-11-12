@@ -281,7 +281,13 @@ def train_subject(
     hypo_threshold = float(config.get('hypo_threshold', 70))
     n_selected_features = int(dwt_cfg.get('selected_features', 18))
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if hasattr(train_subject, '_cli_device') and train_subject._cli_device in ['cuda', 'cpu']:
+        device = torch.device(train_subject._cli_device)
+    else:
+        try:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        except Exception:
+            device = torch.device('cpu')
     print(f"\nUsing device: {device}")
 
     # Load data
@@ -617,6 +623,8 @@ if __name__ == '__main__':
                         help='Cross-validation split mode (stratified or blocked)')
     parser.add_argument('--purge_gap', type=int, default=6,
                         help='Temporal purge gap (windows) around validation block in blocked CV')
+    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'cuda', 'cpu'],
+                        help='Compute device to run training (default: auto)')
     args = parser.parse_args()
 
     train_subject(

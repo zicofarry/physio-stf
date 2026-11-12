@@ -461,6 +461,10 @@ def main():
                         help='Cross-validation split mode (stratified or blocked)')
     parser.add_argument('--purge_gap', type=int, default=6,
                         help='Temporal purge gap (windows) around validation block in blocked CV')
+    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'cuda', 'cpu'],
+                        help='Compute device to run PyTorch models (default: auto)')
+    parser.add_argument('--skip_existing', action='store_true',
+                        help='Skip evaluation if evaluation_results.json already exists in target folder')
     args = parser.parse_args()
 
     subject = args.subject
@@ -495,7 +499,16 @@ def main():
     else:
         folds = metadata.get('stratified_folds', metadata.get('folds', metadata))
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if args.device == 'cpu':
+        device = torch.device('cpu')
+    elif args.device == 'cuda':
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        try:
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        except Exception:
+            device = torch.device('cpu')
+
     print(f"\n========================================================")
     print(f"  Running Baselines for {subject} (cv_mode={cv_mode}) on {device}")
     print(f"========================================================")
@@ -505,13 +518,23 @@ def main():
     for m in args.models:
         folder_name = f"{subject}_baseline_{m}" if cv_mode == 'stratified' else f"{subject}_baseline_{m}_blocked"
         out_folder = os.path.join(args.results_dir, folder_name)
+        out_file = os.path.join(out_folder, 'evaluation_results.json')
+
+        if args.skip_existing and os.path.exists(out_file):
+            print(f"\n--- Skipping Baseline {m.upper()} for {subject} (already exists at {out_file}) ---")
+            continue
+
         os.makedirs(out_folder, exist_ok=True)
         print(f"\n--- Running Baseline: {m.upper()} ({cv_mode}) ---")
 
         if m in ['svm', 'rf']:
             res = run_tabular_baseline(m, folds, X_temporal, y_reg, y_cls)
         elif m == 'quamer':
-            res = run_quamer_baseline(folds, segments, device)
+            try:
+                res = run_quamer_baseline(folds, segments, device)
+            except Exception as e:
+                print(f"  [Warning] Quamer failed on {device} ({e}), falling back to CPU...")
+                res = run_quamer_baseline(folds, segments, torch.device('cpu'))
 
         pooled_oof = compute_pooled_oof_metrics(res)
         summ = summarize_results(res)

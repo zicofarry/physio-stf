@@ -101,6 +101,8 @@ def main():
                         help="Cross-validation split mode (stratified or blocked)")
     parser.add_argument('--purge_gap', type=int, default=6,
                         help="Temporal purge gap (windows) around validation block in blocked CV")
+    parser.add_argument('--device', type=str, default='auto', choices=['auto', 'cuda', 'cpu'],
+                        help="Compute device for training/evaluation (default: auto)")
     parser.add_argument('--cooldown_sec', type=int, default=20,
                         help="Cooldown seconds between heavy runs")
     parser.add_argument('--reextract', action='store_true',
@@ -218,16 +220,17 @@ def main():
     # 5. Baselines Comparison (Table 7)
     if args.mode in ['baselines', 'full']:
         for sub in subjects:
-            run_command(
-                [
-                    sys.executable, 'run_baselines.py',
-                    '--subject', sub,
-                    '--models', *args.models,
-                    '--cv_mode', cv_mode,
-                    '--purge_gap', str(args.purge_gap),
-                ],
-                desc=f"Running Baselines ({', '.join(args.models)}, {cv_mode}) for {sub}",
-            )
+            cmd = [
+                sys.executable, 'run_baselines.py',
+                '--subject', sub,
+                '--models', *args.models,
+                '--cv_mode', cv_mode,
+                '--purge_gap', str(args.purge_gap),
+                '--device', args.device,
+            ]
+            if args.skip_existing:
+                cmd.append('--skip_existing')
+            run_command(cmd, desc=f"Running Baselines ({', '.join(args.models)}, {cv_mode}, device={args.device}) for {sub}")
             cooldown(args.cooldown_sec)
 
     # 6. Dataset Table & Statistical Analysis
