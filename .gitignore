@@ -9,3 +9,8 @@ __pycache__/
 
 # Model weights in results (keep summary JSONs tracked)
 results/**/*.pt
+
+# Experiment logs
+*.log
+logs/*.log
+!logs/.gitkeep

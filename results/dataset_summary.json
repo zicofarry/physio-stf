@@ -1,0 +1,232 @@
+{
+  "subjects": [
+    {
+      "subject": "c1s01_raw",
+      "subject_clean": "c1s01",
+      "cohort": "Cohort 1",
+      "n_windows": 2027,
+      "n_hypo": 130,
+      "n_normal": 1897,
+      "prevalence_pct": 6.413418845584608,
+      "glucose_mean": 113.56746215820313,
+      "glucose_std": 36.81967010498047,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        26,
+        26,
+        26,
+        26,
+        26
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c1s02_raw",
+      "subject_clean": "c1s02",
+      "cohort": "Cohort 1",
+      "n_windows": 2888,
+      "n_hypo": 8,
+      "n_normal": 2880,
+      "prevalence_pct": 0.2770083102493075,
+      "glucose_mean": 155.57689208984374,
+      "glucose_std": 44.585530853271486,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        2,
+        2,
+        2,
+        1,
+        1
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c1s03_raw",
+      "subject_clean": "c1s03",
+      "cohort": "Cohort 1",
+      "n_windows": 2710,
+      "n_hypo": 83,
+      "n_normal": 2627,
+      "prevalence_pct": 3.062730627306273,
+      "glucose_mean": 145.33432006835938,
+      "glucose_std": 55.98779373168945,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        17,
+        17,
+        17,
+        16,
+        16
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c1s04_raw",
+      "subject_clean": "c1s04",
+      "cohort": "Cohort 1",
+      "n_windows": 2324,
+      "n_hypo": 6,
+      "n_normal": 2318,
+      "prevalence_pct": 0.25817555938037867,
+      "glucose_mean": 152.81549072265625,
+      "glucose_std": 48.74351577758789,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        2,
+        1,
+        1,
+        1,
+        1
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c1s05_raw",
+      "subject_clean": "c1s05",
+      "cohort": "Cohort 1",
+      "n_windows": 2850,
+      "n_hypo": 112,
+      "n_normal": 2738,
+      "prevalence_pct": 3.9298245614035086,
+      "glucose_mean": 108.93508758544922,
+      "glucose_std": 27.159203338623048,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        23,
+        23,
+        22,
+        22,
+        22
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c2s01_raw",
+      "subject_clean": "c2s01",
+      "cohort": "Cohort 2",
+      "n_windows": 2858,
+      "n_hypo": 129,
+      "n_normal": 2729,
+      "prevalence_pct": 4.513645906228132,
+      "glucose_mean": 124.46465759277343,
+      "glucose_std": 44.83608169555664,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        26,
+        26,
+        26,
+        26,
+        25
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c2s02_raw",
+      "subject_clean": "c2s02",
+      "cohort": "Cohort 2",
+      "n_windows": 2488,
+      "n_hypo": 155,
+      "n_normal": 2333,
+      "prevalence_pct": 6.229903536977492,
+      "glucose_mean": 109.0217300415039,
+      "glucose_std": 30.927525329589844,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        31,
+        31,
+        31,
+        31,
+        31
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c2s03_raw",
+      "subject_clean": "c2s03",
+      "cohort": "Cohort 2",
+      "n_windows": 2240,
+      "n_hypo": 48,
+      "n_normal": 2192,
+      "prevalence_pct": 2.142857142857143,
+      "glucose_mean": 135.78571166992188,
+      "glucose_std": 38.613633728027345,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        10,
+        10,
+        10,
+        9,
+        9
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c2s04_raw",
+      "subject_clean": "c2s04",
+      "cohort": "Cohort 2",
+      "n_windows": 3248,
+      "n_hypo": 90,
+      "n_normal": 3158,
+      "prevalence_pct": 2.770935960591133,
+      "glucose_mean": 135.76600646972656,
+      "glucose_std": 42.83443374633789,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        18,
+        18,
+        18,
+        18,
+        18
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    },
+    {
+      "subject": "c2s05_raw",
+      "subject_clean": "c2s05",
+      "cohort": "Cohort 2",
+      "n_windows": 3148,
+      "n_hypo": 190,
+      "n_normal": 2958,
+      "prevalence_pct": 6.035578144853876,
+      "glucose_mean": 109.7471420288086,
+      "glucose_std": 35.541439819335935,
+      "glucose_min": null,
+      "glucose_max": null,
+      "stratified_val_hypo_per_fold": [
+        38,
+        38,
+        38,
+        38,
+        38
+      ],
+      "blocked_val_hypo_per_fold": [],
+      "source": "reference_metadata"
+    }
+  ],
+  "totals": {
+    "n_windows": 26781,
+    "n_hypo": 951,
+    "n_normal": 25830,
+    "prevalence_pct": 3.5510249803965497,
+    "glucose_mean_avg": 129.1014500427246,
+    "glucose_std_avg": 40.6048828125
+  }
+}

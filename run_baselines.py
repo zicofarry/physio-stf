@@ -37,7 +37,15 @@ from sklearn.metrics import (
 )
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from test import compute_mard, compute_parkes_error_grid, find_eer_threshold, seed_everything
+from test import (
+    compute_mard,
+    compute_parkes_error_grid,
+    compute_sens_at_spec,
+    compute_pooled_oof_metrics,
+    find_eer_threshold,
+    seed_everything,
+)
+from preprocess_features import build_blocked_splits
 
 
 # ============================================================
@@ -143,8 +151,16 @@ class QuamerFullLateFusion(nn.Module):
 # Baseline Runners
 # ============================================================
 
-def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_thr=None):
-    """Compute standard metrics package."""
+def evaluate_predictions(
+    y_true_reg,
+    y_pred_reg,
+    y_true_cls,
+    y_pred_prob,
+    fixed_thr=None,
+    train_glucose_mean=None,
+    train_glucose_std=None,
+):
+    """Compute standard metrics package including Training-Mean baseline and variance-normalized metrics."""
     y_true_reg = np.asarray(y_true_reg, dtype=float)
     y_pred_reg = np.asarray(y_pred_reg, dtype=float)
     y_true_cls = np.asarray(y_true_cls, dtype=int)
@@ -169,6 +185,7 @@ def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_
 
     sens = float(recall_score(y_true_cls, y_pred_bin, zero_division=0))
     spec = float(recall_score(1 - y_true_cls, 1 - y_pred_bin, zero_division=0))
+    sens_at_90spec = compute_sens_at_spec(y_true_cls, y_pred_prob, target_spec=0.90)
     balanced_acc = 0.5 * (sens + spec)
 
     rmse = float(np.sqrt(mean_squared_error(y_true_reg, y_pred_reg)))
@@ -184,6 +201,18 @@ def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_
         pearson_r = 0.0
     parkes = compute_parkes_error_grid(y_true_reg, y_pred_reg)
 
+    g_mean = float(train_glucose_mean) if train_glucose_mean is not None else float(np.mean(y_true_reg))
+    g_std = float(max(train_glucose_std, 1e-8)) if train_glucose_std is not None else float(max(np.std(y_true_reg), 1e-8))
+    mean_preds = np.full_like(y_true_reg, g_mean, dtype=np.float64)
+    rmse_mean_pred = float(np.sqrt(mean_squared_error(y_true_reg, mean_preds)))
+    mae_mean_pred = float(mean_absolute_error(y_true_reg, mean_preds))
+    mard_mean_pred = compute_mard(y_true_reg, mean_preds)
+    parkes_mean = compute_parkes_error_grid(y_true_reg, mean_preds)
+
+    r2 = float(1.0 - (rmse ** 2) / (g_std ** 2))
+    r2_oos = float(1.0 - (rmse ** 2) / max(rmse_mean_pred ** 2, 1e-8))
+    rmse_sd_ratio = float(rmse / g_std)
+
     return {
         'auc': auc,
         'auprc': auprc,
@@ -191,6 +220,7 @@ def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_
         'balanced_acc': balanced_acc,
         'sensitivity': sens,
         'specificity': spec,
+        'sens_at_90spec': sens_at_90spec,
         'precision': float(precision_score(y_true_cls, y_pred_bin, zero_division=0)),
         'f1': float(f1_score(y_true_cls, y_pred_bin, zero_division=0)),
         'eer_threshold': thr,
@@ -201,6 +231,21 @@ def evaluate_predictions(y_true_reg, y_pred_reg, y_true_cls, y_pred_prob, fixed_
         'parkes_zone_a': parkes['A'],
         'parkes_zone_b': parkes['B'],
         'parkes_ab': parkes['AB'],
+        'train_glucose_mean': g_mean,
+        'train_glucose_std': g_std,
+        'rmse_mean_pred': rmse_mean_pred,
+        'mae_mean_pred': mae_mean_pred,
+        'mard_mean_pred': mard_mean_pred,
+        'parkes_ab_mean_pred': float(parkes_mean['AB']),
+        'r2': r2,
+        'r2_oos': r2_oos,
+        'rmse_sd_ratio': rmse_sd_ratio,
+        'cls_preds': y_pred_prob.tolist(),
+        'cls_binary': y_pred_bin.tolist(),
+        'cls_labels': y_true_cls.tolist(),
+        'reg_preds': y_pred_reg.tolist(),
+        'reg_labels': y_true_reg.tolist(),
+        'mean_preds': mean_preds.tolist(),
     }
 
 
@@ -212,14 +257,20 @@ def run_tabular_baseline(model_type, folds, X_matrix, y_reg_all, y_cls_all):
         tr_idx = fold_info['train']
         va_idx = fold_info['val']
 
+        X_tr_raw = np.nan_to_num(X_matrix[tr_idx], nan=0.0, posinf=0.0, neginf=0.0)
+        X_va_raw = np.nan_to_num(X_matrix[va_idx], nan=0.0, posinf=0.0, neginf=0.0)
+
         scaler = StandardScaler()
-        X_tr = scaler.fit_transform(X_matrix[tr_idx])
-        X_va = scaler.transform(X_matrix[va_idx])
+        X_tr = scaler.fit_transform(X_tr_raw)
+        X_va = scaler.transform(X_va_raw)
 
         y_tr_reg = y_reg_all[tr_idx]
         y_va_reg = y_reg_all[va_idx]
         y_tr_cls = y_cls_all[tr_idx]
         y_va_cls = y_cls_all[va_idx]
+
+        g_mean = float(np.mean(y_tr_reg))
+        g_std = float(max(np.std(y_tr_reg), 1.0))
 
         if model_type == 'svm':
             reg = SVR(C=10.0, epsilon=0.1)
@@ -229,16 +280,22 @@ def run_tabular_baseline(model_type, folds, X_matrix, y_reg_all, y_cls_all):
             clf = RandomForestClassifier(n_estimators=100, max_depth=12, class_weight='balanced', random_state=42, n_jobs=-1)
 
         reg.fit(X_tr, y_tr_reg)
-        clf.fit(X_tr, y_tr_cls)
-
         pred_reg = reg.predict(X_va)
-        prob_cls = clf.predict_proba(X_va)[:, 1]
 
-        # Determine threshold on train
-        tr_prob = clf.predict_proba(X_tr)[:, 1]
-        thr = find_eer_threshold(y_tr_cls, tr_prob)
+        if len(np.unique(y_tr_cls)) >= 2:
+            clf.fit(X_tr, y_tr_cls)
+            prob_cls = clf.predict_proba(X_va)[:, 1]
+            tr_prob = clf.predict_proba(X_tr)[:, 1]
+            thr = find_eer_threshold(y_tr_cls, tr_prob)
+        else:
+            # Fallback if a blocked fold has only 1 class in training
+            prob_cls = 1.0 / (1.0 + np.exp((pred_reg - 70.0) / 10.0))
+            thr = 0.5
 
-        metrics = evaluate_predictions(y_va_reg, pred_reg, y_va_cls, prob_cls, fixed_thr=thr)
+        metrics = evaluate_predictions(
+            y_va_reg, pred_reg, y_va_cls, prob_cls,
+            fixed_thr=thr, train_glucose_mean=g_mean, train_glucose_std=g_std,
+        )
         results[fold_name] = metrics
 
     return results
@@ -361,7 +418,10 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
                 r_mgdl = r_pred * g_std + g_mean
                 va_preds_reg.extend(r_mgdl.reshape(-1).cpu().numpy().tolist())
 
-        metrics = evaluate_predictions(va_ds.glucose, va_preds_reg, va_ds.labels, va_preds_prob, fixed_thr=tr_thr)
+        metrics = evaluate_predictions(
+            va_ds.glucose, va_preds_reg, va_ds.labels, va_preds_prob,
+            fixed_thr=tr_thr, train_glucose_mean=g_mean, train_glucose_std=g_std,
+        )
         results[fold_name] = metrics
         del model, opt
         if torch.cuda.is_available():
@@ -374,12 +434,15 @@ def run_quamer_baseline(folds, segments, device, epochs=40, lr=0.0005):
 def summarize_results(res_dict):
     keys = [
         'auc', 'auprc', 'acc', 'balanced_acc', 'f1',
-        'sensitivity', 'specificity', 'rmse', 'mae', 'mard', 'pearson_r', 'parkes_ab'
+        'sensitivity', 'specificity', 'sens_at_90spec',
+        'rmse', 'rmse_mean_pred', 'r2', 'r2_oos', 'rmse_sd_ratio',
+        'mae', 'mard', 'pearson_r', 'parkes_ab'
     ]
     summary = {}
     for k in keys:
-        vals = [v[k] for v in res_dict.values() if k in v]
-        summary[k] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
+        vals = [v[k] for v in res_dict.values() if isinstance(v, dict) and k in v]
+        if vals:
+            summary[k] = {'mean': float(np.mean(vals)), 'std': float(np.std(vals))}
     return summary
 
 
@@ -394,9 +457,14 @@ def main():
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--results_dir', type=str, default='./results')
     parser.add_argument('--models', nargs='+', default=['svm', 'rf', 'quamer'], choices=['svm', 'rf', 'quamer'])
+    parser.add_argument('--cv_mode', type=str, default='stratified', choices=['stratified', 'blocked'],
+                        help='Cross-validation split mode (stratified or blocked)')
+    parser.add_argument('--purge_gap', type=int, default=6,
+                        help='Temporal purge gap (windows) around validation block in blocked CV')
     args = parser.parse_args()
 
     subject = args.subject
+    cv_mode = args.cv_mode.lower()
     meta_path = os.path.join(args.data_dir, subject, 'metadata.json')
     segments_path = os.path.join(args.data_dir, subject, 'segments.pkl')
     temporal_path = os.path.join(args.data_dir, subject, 'temporal_features.pkl')
@@ -408,41 +476,65 @@ def main():
     with open(temporal_path, 'rb') as f:
         temporal_data = pickle.load(f)
 
-    folds = metadata.get('folds', metadata)
     hypo_thr = float(metadata.get('hypo_threshold', 70))
     X_temporal = temporal_data.get('raw', temporal_data.get('selected'))
     y_reg = np.array([s['glucose'] for s in segments], dtype=np.float32)
     y_cls = (y_reg < hypo_thr).astype(int)
 
+    if cv_mode == 'blocked':
+        if 'blocked_folds' in metadata and isinstance(metadata['blocked_folds'], dict):
+            folds = metadata['blocked_folds']
+        else:
+            raw_blocked_splits = build_blocked_splits(
+                segments, y_cls, n_folds=5, purge_gap=args.purge_gap
+            )
+            folds = {
+                f"v{i + 1}": {'train': tr.tolist(), 'val': va.tolist()}
+                for i, (tr, va) in enumerate(raw_blocked_splits)
+            }
+    else:
+        folds = metadata.get('stratified_folds', metadata.get('folds', metadata))
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"\n========================================================")
-    print(f"  Running Baselines for {subject} on {device}")
+    print(f"  Running Baselines for {subject} (cv_mode={cv_mode}) on {device}")
     print(f"========================================================")
 
+    raw_keys = {'cls_preds', 'cls_binary', 'cls_labels', 'reg_preds', 'reg_labels', 'mean_preds'}
+
     for m in args.models:
-        out_folder = os.path.join(args.results_dir, f"{subject}_baseline_{m}")
+        folder_name = f"{subject}_baseline_{m}" if cv_mode == 'stratified' else f"{subject}_baseline_{m}_blocked"
+        out_folder = os.path.join(args.results_dir, folder_name)
         os.makedirs(out_folder, exist_ok=True)
-        print(f"\n--- Running Baseline: {m.upper()} ---")
+        print(f"\n--- Running Baseline: {m.upper()} ({cv_mode}) ---")
 
         if m in ['svm', 'rf']:
             res = run_tabular_baseline(m, folds, X_temporal, y_reg, y_cls)
         elif m == 'quamer':
             res = run_quamer_baseline(folds, segments, device)
 
+        pooled_oof = compute_pooled_oof_metrics(res)
         summ = summarize_results(res)
         print(f"  Results for {m.upper()}:")
         print(f"    AUC:        {summ['auc']['mean']:.4f} ± {summ['auc']['std']:.4f}")
         print(f"    AUPRC:      {summ['auprc']['mean']:.4f} ± {summ['auprc']['std']:.4f}")
         print(f"    F1:         {summ['f1']['mean']:.4f} ± {summ['f1']['std']:.4f}")
         print(f"    BalAcc:     {summ['balanced_acc']['mean']:.4f} ± {summ['balanced_acc']['std']:.4f}")
-        print(f"    RMSE:       {summ['rmse']['mean']:.2f} ± {summ['rmse']['std']:.2f} mg/dL")
+        print(f"    Sens@90Sp:  {summ['sens_at_90spec']['mean']:.4f} ± {summ['sens_at_90spec']['std']:.4f}")
+        print(f"    RMSE:       {summ['rmse']['mean']:.2f} ± {summ['rmse']['std']:.2f} mg/dL (R2={summ['r2']['mean']:.4f}, RMSE/SD={summ['rmse_sd_ratio']['mean']:.4f})")
         print(f"    MARD:       {summ['mard']['mean']:.2f} ± {summ['mard']['std']:.2f}%")
         print(f"    Pearson r:  {summ['pearson_r']['mean']:.4f} ± {summ['pearson_r']['std']:.4f}")
         print(f"    Parkes AB:  {summ['parkes_ab']['mean']:.2f} ± {summ['parkes_ab']['std']:.2f}%")
 
+        save_res = {}
+        for fold_k, fold_v in res.items():
+            save_res[fold_k] = {k: v for k, v in fold_v.items() if k not in raw_keys}
+        if pooled_oof:
+            save_res['pooled_oof'] = pooled_oof
+
         out_file = os.path.join(out_folder, 'evaluation_results.json')
         with open(out_file, 'w') as f:
-            json.dump(res, f, indent=2)
+            json.dump(save_res, f, indent=2)
         print(f"  Saved -> {out_file}")
 
 

@@ -35,6 +35,7 @@ from sklearn.metrics import (
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from libs.st_mgm_model import STMGMModel, MultiTaskLoss
 from libs.dataloader import STMGMDataset, stmgm_collate_fn
+from preprocess_features import build_blocked_splits
 
 
 def seed_everything(seed=42):
@@ -105,6 +106,26 @@ def find_eer_threshold(targets, probs):
     q_prev_clipped = float(np.clip(q_prev, 0.20, 0.80))
     thr = 0.7 * thr_opt + 0.3 * q_prev_clipped
     return float(np.clip(thr, 0.20, 0.80))
+
+
+def compute_sens_at_spec(targets, probs, target_spec=0.90):
+    """
+    Compute maximum Sensitivity (TPR) achieved where Specificity >= target_spec
+    (i.e. False Positive Rate <= 1 - target_spec).
+    """
+    targets = np.asarray(targets).reshape(-1)
+    probs = np.asarray(probs, dtype=np.float64).reshape(-1)
+    if len(targets) == 0 or len(np.unique(targets)) < 2:
+        return 0.0
+    try:
+        fpr, tpr, _ = roc_curve(targets, probs)
+        max_fpr = 1.0 - float(target_spec) + 1e-8
+        valid = fpr <= max_fpr
+        if not np.any(valid):
+            return 0.0
+        return float(np.max(tpr[valid]))
+    except Exception:
+        return 0.0
 
 
 def compute_mard(y_true, y_pred):
@@ -241,6 +262,7 @@ def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, 
     acc = accuracy_score(cls_labels, cls_binary)
     sens = recall_score(cls_labels, cls_binary, zero_division=0)
     spec = recall_score(1 - cls_labels, 1 - cls_binary, zero_division=0)
+    sens_at_90spec = compute_sens_at_spec(cls_labels, cls_preds, target_spec=0.90)
     balanced_acc = 0.5 * (float(sens) + float(spec))
     prec = precision_score(cls_labels, cls_binary, zero_division=0)
     f1 = f1_score(cls_labels, cls_binary, zero_division=0)
@@ -259,6 +281,20 @@ def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, 
         pearson_r = 0.0
     parkes = compute_parkes_error_grid(reg_labels, reg_preds)
 
+    # Training-Mean Predictor baseline & Variance-Normalized Regression Metrics (MJ-1, MJ-3)
+    train_glucose_mean = float(glucose_mean)
+    train_glucose_std = float(max(glucose_std, 1e-8))
+    mean_preds = np.full_like(reg_labels, train_glucose_mean, dtype=np.float64)
+    rmse_mean_pred = float(np.sqrt(mean_squared_error(reg_labels, mean_preds)))
+    mae_mean_pred = float(mean_absolute_error(reg_labels, mean_preds))
+    mard_mean_pred = compute_mard(reg_labels, mean_preds)
+    parkes_mean = compute_parkes_error_grid(reg_labels, mean_preds)
+    parkes_ab_mean_pred = float(parkes_mean['AB'])
+
+    r2 = float(1.0 - (rmse ** 2) / (train_glucose_std ** 2))
+    r2_oos = float(1.0 - (rmse ** 2) / max(rmse_mean_pred ** 2, 1e-8))
+    rmse_sd_ratio = float(rmse / train_glucose_std)
+
     return {
         # Classification
         'auc': float(auc),
@@ -267,6 +303,7 @@ def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, 
         'balanced_acc': float(balanced_acc),
         'sensitivity': float(sens),
         'specificity': float(spec),
+        'sens_at_90spec': float(sens_at_90spec),
         'precision': float(prec),
         'f1': float(f1),
         'eer_threshold': float(threshold),
@@ -279,11 +316,128 @@ def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, 
         'parkes_zone_a': parkes['A'],
         'parkes_zone_b': parkes['B'],
         'parkes_ab': parkes['AB'],
-        # Raw predictions
+        # Training-Mean Baseline & Normalized Variance Metrics
+        'train_glucose_mean': train_glucose_mean,
+        'train_glucose_std': train_glucose_std,
+        'rmse_mean_pred': rmse_mean_pred,
+        'mae_mean_pred': mae_mean_pred,
+        'mard_mean_pred': mard_mean_pred,
+        'parkes_ab_mean_pred': parkes_ab_mean_pred,
+        'r2': r2,
+        'r2_oos': r2_oos,
+        'rmse_sd_ratio': rmse_sd_ratio,
+        # Raw predictions (stripped before saving fold dict, used for pooled OOF)
         'cls_preds': cls_preds.tolist(),
+        'cls_binary': cls_binary.tolist(),
         'cls_labels': cls_labels.tolist(),
         'reg_preds': reg_preds.tolist(),
         'reg_labels': reg_labels.tolist(),
+        'mean_preds': mean_preds.tolist(),
+    }
+
+
+def compute_pooled_oof_metrics(all_results):
+    """
+    Pool Out-of-Fold (OOF) predictions across all evaluated folds to compute
+    aggregate metrics without zero-positive single-fold distortion on rare-event subjects.
+    """
+    cls_preds_all, cls_binary_all, cls_labels_all = [], [], []
+    reg_preds_all, reg_labels_all, mean_preds_all = [], [], []
+    fold_stds = []
+
+    for fold_name, res in all_results.items():
+        if not isinstance(res, dict) or 'cls_labels' not in res:
+            continue
+        cls_preds_all.extend(res['cls_preds'])
+        cls_binary_all.extend(res.get('cls_binary', (np.array(res['cls_preds']) >= res.get('eer_threshold', 0.5)).astype(int).tolist()))
+        cls_labels_all.extend(res['cls_labels'])
+        reg_preds_all.extend(res['reg_preds'])
+        reg_labels_all.extend(res['reg_labels'])
+        if 'mean_preds' in res:
+            mean_preds_all.extend(res['mean_preds'])
+        else:
+            g_m = float(res.get('train_glucose_mean', np.mean(res['reg_labels'])))
+            mean_preds_all.extend([g_m] * len(res['reg_labels']))
+        if 'train_glucose_std' in res:
+            fold_stds.append(float(res['train_glucose_std']))
+
+    if len(cls_labels_all) == 0:
+        return {}
+
+    cls_preds = np.array(cls_preds_all, dtype=np.float64)
+    cls_binary = np.array(cls_binary_all, dtype=np.int64)
+    cls_labels = np.array(cls_labels_all, dtype=np.int64)
+    reg_preds = np.array(reg_preds_all, dtype=np.float64)
+    reg_labels = np.array(reg_labels_all, dtype=np.float64)
+    mean_preds = np.array(mean_preds_all, dtype=np.float64)
+
+    try:
+        auc = float(roc_auc_score(cls_labels, cls_preds)) if len(np.unique(cls_labels)) > 1 else 0.5
+    except Exception:
+        auc = 0.5
+
+    try:
+        auprc = float(average_precision_score(cls_labels, cls_preds)) if len(np.unique(cls_labels)) > 1 else 0.0
+    except Exception:
+        auprc = 0.0
+
+    acc = float(accuracy_score(cls_labels, cls_binary))
+    sens = float(recall_score(cls_labels, cls_binary, zero_division=0))
+    spec = float(recall_score(1 - cls_labels, 1 - cls_binary, zero_division=0))
+    sens_at_90spec = compute_sens_at_spec(cls_labels, cls_preds, target_spec=0.90)
+    balanced_acc = 0.5 * (sens + spec)
+    prec = float(precision_score(cls_labels, cls_binary, zero_division=0))
+    f1 = float(f1_score(cls_labels, cls_binary, zero_division=0))
+
+    rmse = float(np.sqrt(mean_squared_error(reg_labels, reg_preds)))
+    mae = float(mean_absolute_error(reg_labels, reg_preds))
+    mard = compute_mard(reg_labels, reg_preds)
+    try:
+        if len(reg_labels) > 1 and np.std(reg_labels) > 1e-8 and np.std(reg_preds) > 1e-8:
+            r_val = float(np.corrcoef(reg_labels, reg_preds)[0, 1])
+            pearson_r = r_val if np.isfinite(r_val) else 0.0
+        else:
+            pearson_r = 0.0
+    except Exception:
+        pearson_r = 0.0
+    parkes = compute_parkes_error_grid(reg_labels, reg_preds)
+
+    rmse_mean_pred = float(np.sqrt(mean_squared_error(reg_labels, mean_preds)))
+    mae_mean_pred = float(mean_absolute_error(reg_labels, mean_preds))
+    mard_mean_pred = compute_mard(reg_labels, mean_preds)
+    parkes_mean = compute_parkes_error_grid(reg_labels, mean_preds)
+
+    pooled_std = float(np.mean(fold_stds)) if fold_stds else float(max(np.std(reg_labels), 1e-8))
+    r2 = float(1.0 - (rmse ** 2) / max(pooled_std ** 2, 1e-8))
+    r2_oos = float(1.0 - (rmse ** 2) / max(rmse_mean_pred ** 2, 1e-8))
+    rmse_sd_ratio = float(rmse / max(pooled_std, 1e-8))
+
+    return {
+        'n_windows': int(len(cls_labels)),
+        'n_hypo': int(np.sum(cls_labels == 1)),
+        'auc': auc,
+        'auprc': auprc,
+        'acc': acc,
+        'balanced_acc': balanced_acc,
+        'sensitivity': sens,
+        'specificity': spec,
+        'sens_at_90spec': sens_at_90spec,
+        'precision': prec,
+        'f1': f1,
+        'rmse': rmse,
+        'mae': mae,
+        'mard': mard,
+        'pearson_r': pearson_r,
+        'parkes_zone_a': parkes['A'],
+        'parkes_zone_b': parkes['B'],
+        'parkes_ab': parkes['AB'],
+        'rmse_mean_pred': rmse_mean_pred,
+        'mae_mean_pred': mae_mean_pred,
+        'mard_mean_pred': mard_mean_pred,
+        'parkes_ab_mean_pred': float(parkes_mean['AB']),
+        'r2': r2,
+        'r2_oos': r2_oos,
+        'rmse_sd_ratio': rmse_sd_ratio,
     }
 
 
@@ -291,8 +445,8 @@ def evaluate_fold(model, dataloader, device, glucose_mean=0.0, glucose_std=1.0, 
 # Main Evaluation
 # ============================================================
 
-def test_subject(subject, data_dir='./data', results_dir='./results', variant='M9'):
-    """Evaluate all folds for a subject (supports variant folders)."""
+def test_subject(subject, data_dir='./data', results_dir='./results', variant='M9', cv_mode='stratified', purge_gap=6):
+    """Evaluate all folds for a subject (supports variant folders and stratified/blocked CV)."""
     seed_everything(42)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"\nUsing device: {device}")
@@ -302,7 +456,11 @@ def test_subject(subject, data_dir='./data', results_dir='./results', variant='M
     temporal_path = os.path.join(data_dir, subject, 'temporal_features.pkl')
 
     variant_name = variant.upper()
-    model_dir = os.path.join(results_dir, subject) if variant_name == 'M9' else os.path.join(results_dir, f"{subject}_{variant_name.lower()}")
+    cv_mode = cv_mode.lower()
+    base_folder = subject if variant_name == 'M9' else f"{subject}_{variant_name.lower()}"
+    if cv_mode == 'blocked':
+        base_folder = f"{base_folder}_blocked"
+    model_dir = os.path.join(results_dir, base_folder)
     summary_path = os.path.join(model_dir, 'training_summary.json')
 
     if not os.path.exists(meta_path):
@@ -331,10 +489,24 @@ def test_subject(subject, data_dir='./data', results_dir='./results', variant='M
         metadata.get('fold_selected_indices', {}),
     )
     hypo_threshold = float(metadata.get('hypo_threshold', 70))
-    folds = metadata.get('folds', metadata)
+    if cv_mode == 'blocked':
+        if 'blocked_folds' in metadata and isinstance(metadata['blocked_folds'], dict):
+            folds = metadata['blocked_folds']
+        else:
+            all_glucose = np.array([seg['glucose'] for seg in segments], dtype=np.float32)
+            all_labels_cls = (all_glucose < hypo_threshold).astype(int)
+            raw_blocked_splits = build_blocked_splits(
+                segments, all_labels_cls, n_folds=5, purge_gap=purge_gap
+            )
+            folds = {
+                f"v{i + 1}": {'train': tr.tolist(), 'val': va.tolist()}
+                for i, (tr, va) in enumerate(raw_blocked_splits)
+            }
+    else:
+        folds = metadata.get('stratified_folds', metadata.get('folds', metadata))
 
     print(f"\n{'='*60}")
-    print(f"  ST-MGM Evaluation: {subject}")
+    print(f"  ST-MGM Evaluation: {subject} (variant={variant_name}, cv_mode={cv_mode})")
     print(f"{'='*60}")
 
     all_results = {}
@@ -426,8 +598,9 @@ def test_subject(subject, data_dir='./data', results_dir='./results', variant='M
         print(f"  Classification: AUC={results['auc']:.4f}, AUPRC={results['auprc']:.4f}, "
               f"F1={results['f1']:.4f}, BalAcc={results['balanced_acc']:.4f}, "
               f"Sens={results['sensitivity']:.4f}, Spec={results['specificity']:.4f}, "
-              f"Acc={results['acc']:.4f}")
-        print(f"  Regression:     RMSE={results['rmse']:.2f} mg/dL, "
+              f"Sens@90Spec={results['sens_at_90spec']:.4f}, Acc={results['acc']:.4f}")
+        print(f"  Regression:     RMSE={results['rmse']:.2f} mg/dL (MeanPred={results['rmse_mean_pred']:.2f}), "
+              f"R2={results['r2']:.4f}, RMSE/SD={results['rmse_sd_ratio']:.4f}, "
               f"MAE={results['mae']:.2f} mg/dL, MARD={results['mard']:.2f}%, "
               f"Pearson r={results['pearson_r']:.4f}")
         print(f"  Parkes Grid:    A+B={results['parkes_ab']:.2f}% "
@@ -443,8 +616,13 @@ def test_subject(subject, data_dir='./data', results_dir='./results', variant='M
             'balanced_acc': results['balanced_acc'],
             'sensitivity': results['sensitivity'],
             'specificity': results['specificity'],
+            'sens_at_90spec': results['sens_at_90spec'],
             'acc': results['acc'],
             'rmse': results['rmse'],
+            'rmse_mean_pred': results['rmse_mean_pred'],
+            'r2': results['r2'],
+            'r2_oos': results['r2_oos'],
+            'rmse_sd_ratio': results['rmse_sd_ratio'],
             'mae': results['mae'],
             'mard': results['mard'],
             'pearson_r': results['pearson_r'],
@@ -465,24 +643,33 @@ def test_subject(subject, data_dir='./data', results_dir='./results', variant='M
         print(f"  Average Results ({len(metrics_list)} folds)")
         print(f"{'='*60}")
 
-        for metric in ['auc', 'auprc', 'f1', 'balanced_acc', 'sensitivity', 'specificity', 'acc',
-                       'rmse', 'mae', 'mard', 'pearson_r', 'parkes_zone_a', 'parkes_zone_b', 'parkes_ab']:
+        for metric in ['auc', 'auprc', 'f1', 'balanced_acc', 'sensitivity', 'specificity',
+                       'sens_at_90spec', 'acc', 'rmse', 'rmse_mean_pred', 'r2', 'rmse_sd_ratio',
+                       'mae', 'mard', 'pearson_r', 'parkes_zone_a', 'parkes_zone_b', 'parkes_ab']:
             values = [m[metric] for m in metrics_list]
-            if metric in ['rmse', 'mae']:
+            if metric in ['rmse', 'rmse_mean_pred', 'mae']:
                 unit = ' mg/dL'
             elif metric in ['mard', 'parkes_zone_a', 'parkes_zone_b', 'parkes_ab']:
                 unit = '%'
             else:
                 unit = ''
-            print(f"  {metric.upper():14s}: {np.mean(values):.4f} ± {np.std(values):.4f}{unit}")
+            print(f"  {metric.upper():16s}: {np.mean(values):.4f} ± {np.std(values):.4f}{unit}")
+
+    pooled_oof = compute_pooled_oof_metrics(all_results)
+    if pooled_oof:
+        print(f"\n  Pooled OOF ({pooled_oof['n_windows']} windows, {pooled_oof['n_hypo']} hypo): "
+              f"AUC={pooled_oof['auc']:.4f}, AUPRC={pooled_oof['auprc']:.4f}, "
+              f"F1={pooled_oof['f1']:.4f}, BalAcc={pooled_oof['balanced_acc']:.4f}, "
+              f"RMSE={pooled_oof['rmse']:.2f} mg/dL, R2={pooled_oof['r2']:.4f}")
 
     # Save results
     eval_path = os.path.join(model_dir, 'evaluation_results.json')
-    # Remove raw predictions from saved results to reduce file size
+    raw_keys = {'cls_preds', 'cls_binary', 'cls_labels', 'reg_preds', 'reg_labels', 'mean_preds'}
     save_results = {}
     for fold, res in all_results.items():
-        save_results[fold] = {k: v for k, v in res.items()
-                              if k not in ['cls_preds', 'cls_labels', 'reg_preds', 'reg_labels']}
+        save_results[fold] = {k: v for k, v in res.items() if k not in raw_keys}
+    if pooled_oof:
+        save_results['pooled_oof'] = pooled_oof
     with open(eval_path, 'w') as f:
         json.dump(save_results, f, indent=2)
     print(f"\nResults saved to {eval_path}")
@@ -505,6 +692,18 @@ if __name__ == '__main__':
     parser.add_argument('--results_dir', type=str, default='./results')
     parser.add_argument('--variant', type=str, default='M9', choices=VALID_VARIANTS,
                         help='Ablation variant folder to evaluate')
+    parser.add_argument('--cv_mode', type=str, default='stratified',
+                        choices=['stratified', 'blocked'],
+                        help='Cross-validation split mode (stratified or blocked)')
+    parser.add_argument('--purge_gap', type=int, default=6,
+                        help='Temporal purge gap (windows) around validation block in blocked CV')
     args = parser.parse_args()
 
-    test_subject(args.subject, args.data_dir, args.results_dir, args.variant)
+    test_subject(
+        args.subject,
+        args.data_dir,
+        args.results_dir,
+        args.variant,
+        args.cv_mode,
+        args.purge_gap,
+    )

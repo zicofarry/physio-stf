@@ -35,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from libs.st_mgm_model import STMGMModel, STMGMFusionOnly, MultiTaskLoss
 from libs.dataloader import STMGMDataset, FeatureDataset, stmgm_collate_fn
 from libs.dwt_features import combined_feature_selection
+from preprocess_features import build_blocked_splits
 
 
 def find_eer_threshold(targets, probs):
@@ -249,7 +250,16 @@ def load_config():
     return {}
 
 
-def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', variant='M9', task_mode='multitask'):
+def train_subject(
+    subject,
+    data_dir='./data',
+    out_dir='./results',
+    mode='e2e',
+    variant='M9',
+    task_mode='multitask',
+    cv_mode='stratified',
+    purge_gap=6,
+):
     """
     Train ST-MGM or Ablation Variant for a given subject.
 
@@ -260,6 +270,8 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
         mode: 'e2e' (end-to-end) or 'fusion_only'
         variant: Ablation variant ('M1', 'M2', 'M3', 'M6', 'M7', 'M8', 'M9', 'M9_CLS', 'M9_REG', 'M9_NOCOUPLE')
         task_mode: 'multitask', 'cls_only', or 'reg_only'
+        cv_mode: 'stratified' or 'blocked'
+        purge_gap: Number of windows to purge around validation block in blocked CV
     """
     seed_everything(42)
 
@@ -299,9 +311,28 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
     )
     hypo_threshold = float(metadata.get('hypo_threshold', hypo_threshold))
 
-    folds = metadata.get('folds', metadata)
+    cv_mode = cv_mode.lower()
+    if cv_mode == 'blocked':
+        if 'blocked_folds' in metadata and isinstance(metadata['blocked_folds'], dict):
+            folds = metadata['blocked_folds']
+        else:
+            all_glucose = np.array([seg['glucose'] for seg in segments], dtype=np.float32)
+            all_labels_cls = (all_glucose < hypo_threshold).astype(int)
+            raw_blocked_splits = build_blocked_splits(
+                segments, all_labels_cls, n_folds=5, purge_gap=purge_gap
+            )
+            folds = {
+                f"v{i + 1}": {'train': tr.tolist(), 'val': va.tolist()}
+                for i, (tr, va) in enumerate(raw_blocked_splits)
+            }
+    else:
+        folds = metadata.get('stratified_folds', metadata.get('folds', metadata))
+
     variant_name = variant.upper()
-    save_dir = os.path.join(out_dir, subject) if variant_name == 'M9' and task_mode == 'multitask' else os.path.join(out_dir, f"{subject}_{variant_name.lower()}")
+    base_folder = subject if (variant_name == 'M9' and task_mode == 'multitask') else f"{subject}_{variant_name.lower()}"
+    if cv_mode == 'blocked':
+        base_folder = f"{base_folder}_blocked"
+    save_dir = os.path.join(out_dir, base_folder)
     os.makedirs(save_dir, exist_ok=True)
 
     # Training hyperparameters
@@ -319,7 +350,8 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
     elif variant_name in ['M9_REG', 'SINGLE_REG'] or task_mode == 'reg_only':
         alpha, beta = 0.0, 1.0
 
-    print(f"\nTraining ST-MGM ({mode}, variant={variant_name}, task_mode={task_mode}) for {subject}")
+    print(f"\nTraining ST-MGM ({mode}, variant={variant_name}, task_mode={task_mode}, cv_mode={cv_mode}) for {subject}")
+    print(f"  Output dir: {save_dir}")
     print(f"  Target selected features: {n_selected_features}, Folds: {list(folds.keys())}")
     print(f"  LR: {lr}, Batch: {batch_size}, Epochs: {epochs}, Patience: {patience}")
     print(f"  Loss weights: alpha={alpha} (BCEWithLogits), beta={beta} (MSE/Huber), grad_clip={max_grad_norm}")
@@ -523,6 +555,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
                 'pos_weight': pos_weight_val,
                 'temporal_dim': temporal_dim,
                 'variant': variant_name,
+                'cv_mode': cv_mode,
             }
             torch.save(checkpoint_payload, model_path)
             print(f"  Saved best model → {model_path} "
@@ -541,6 +574,7 @@ def train_subject(subject, data_dir='./data', out_dir='./results', mode='e2e', v
             'eer_threshold': float(train_eer_threshold),
             'pos_weight': pos_weight_val,
             'variant': variant_name,
+            'cv_mode': cv_mode,
         }
 
         # Cleanup
@@ -578,6 +612,20 @@ if __name__ == '__main__':
     parser.add_argument('--task_mode', type=str, default='multitask',
                         choices=['multitask', 'cls_only', 'reg_only'],
                         help='Training objective mode')
+    parser.add_argument('--cv_mode', type=str, default='stratified',
+                        choices=['stratified', 'blocked'],
+                        help='Cross-validation split mode (stratified or blocked)')
+    parser.add_argument('--purge_gap', type=int, default=6,
+                        help='Temporal purge gap (windows) around validation block in blocked CV')
     args = parser.parse_args()
 
-    train_subject(args.subject, args.data_dir, args.out_dir, args.mode, args.variant, args.task_mode)
+    train_subject(
+        args.subject,
+        args.data_dir,
+        args.out_dir,
+        args.mode,
+        args.variant,
+        args.task_mode,
+        args.cv_mode,
+        args.purge_gap,
+    )
