@@ -144,17 +144,13 @@ def format_p_val(p):
 
 
 def get_feature_names():
-    ecgs = ['HR_mean', 'HR_std', 'HRV_RMSSD', 'HRV_SDNN', 'HRV_pNN50', 'QTc_mean', 'QTc_std', 'T_amp_mean']
-    ppgs = ['PPG_SpO2_est', 'PPG_PRV', 'PPG_amp_mean', 'PPG_width_mean', 'PPG_rise_time', 'PPG_systolic_area']
-    edas = ['EDA_SCR_count', 'EDA_SCR_amp', 'EDA_SCL_mean', 'EDA_SCL_std']
-    base = ecgs + ppgs + edas
-    stats = ['Mean', 'SD', 'Min', 'Max', 'SK', 'CO', 'Median', 'Entropy']
-    bands = ['D1', 'D2', 'D3', 'D4', 'D5', 'A5']
+    stats10 = ['Kur', 'Ske', 'SM', 'SC', 'FD', 'CD', 'CO', 'PSE', 'KE', 'SE']
+    mods = ['E', 'P']
     names = []
-    for feat in base:
-        for band in bands:
-            for st in stats:
-                names.append(f"{feat}_{band}_{st}")
+    for m in mods:
+        for sb in range(8):
+            for st in stats10:
+                names.append(f"{st}_{m}{sb}")
     return names
 
 
@@ -275,10 +271,30 @@ def main():
         'fold_level': compute_wilcoxon(fold_rmse_m9, fold_rmse_mean),
     }
 
+    # M9 Blocked vs Stratified across 10 subjects and 50 folds
+    blk_map = summary_data.get('m9_blocked', {})
+    common_blk = [s for s in ALL_SUBJECTS if s in m9_map and s in blk_map]
+    if common_blk:
+        summary_data['wilcoxon_blocked_vs_stratified'] = {'n_subjects': len(common_blk), 'subject_level': {}, 'fold_level': {}}
+        for metric in ['auc', 'auprc', 'f1', 'balanced_acc', 'rmse', 'mard', 'pearson_r', 'parkes_ab']:
+            sub_a = [m9_map[s][metric]['mean'] for s in common_blk if metric in m9_map[s] and metric in blk_map[s]]
+            sub_b = [blk_map[s][metric]['mean'] for s in common_blk if metric in m9_map[s] and metric in blk_map[s]]
+            summary_data['wilcoxon_blocked_vs_stratified']['subject_level'][metric] = compute_wilcoxon(sub_a, sub_b)
+
+            fold_a, fold_b = [], []
+            for s in common_blk:
+                if metric in m9_map[s] and metric in blk_map[s]:
+                    va = m9_map[s][metric]['values']
+                    vb = blk_map[s][metric]['values']
+                    if len(va) == len(vb):
+                        fold_a.extend(va)
+                        fold_b.extend(vb)
+            summary_data['wilcoxon_blocked_vs_stratified']['fold_level'][metric] = compute_wilcoxon(fold_a, fold_b)
+
     # 6. Feature Selection Distribution across 50 Folds
     feat_names = get_feature_names()
-    stat_counts = {'Mean': 0, 'SD': 0, 'Min': 0, 'Max': 0, 'SK': 0, 'CO': 0, 'Median': 0, 'Entropy': 0}
-    mod_counts = {'ECG': 0, 'PPG': 0, 'EDA': 0}
+    stat_counts = {'Kur': 0, 'Ske': 0, 'SM': 0, 'SC': 0, 'FD': 0, 'CD': 0, 'CO': 0, 'PSE': 0, 'KE': 0, 'SE': 0}
+    mod_counts = {'ECG': 0, 'PPG': 0}
     idx_counts = {}
     total_folds_counted = 0
 
@@ -294,15 +310,13 @@ def main():
                     idx_counts[idx_int] = idx_counts.get(idx_int, 0) + 1
                     if 0 <= idx_int < len(feat_names):
                         fname = feat_names[idx_int]
-                        st = fname.split('_')[-1]
+                        st = fname.split('_')[0]
                         if st in stat_counts:
                             stat_counts[st] += 1
-                        if fname.startswith('PPG_'):
-                            mod_counts['PPG'] += 1
-                        elif fname.startswith('EDA_'):
-                            mod_counts['EDA'] += 1
-                        else:
+                        if idx_int < 80:
                             mod_counts['ECG'] += 1
+                        else:
+                            mod_counts['PPG'] += 1
 
     top_features = sorted(idx_counts.items(), key=lambda x: (-x[1], x[0]))[:20]
     summary_data['feature_selection_50folds'] = {
