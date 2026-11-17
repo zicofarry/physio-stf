@@ -1,6 +1,7 @@
 # Datasets and generated feature outputs
 dataset/
 data/
+trash/
 
 # Python virtual environment and bytecode caches
 venv/

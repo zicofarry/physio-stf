@@ -8,10 +8,10 @@
       "n_hypo": 130,
       "n_normal": 1897,
       "prevalence_pct": 6.413418845584608,
-      "glucose_mean": 113.56746215820313,
-      "glucose_std": 36.81967010498047,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 113.56734089787864,
+      "glucose_std": 36.82743902853969,
+      "glucose_min": 40.0,
+      "glucose_max": 267.0,
       "stratified_val_hypo_per_fold": [
         26,
         26,
@@ -19,8 +19,14 @@
         26,
         26
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        54,
+        12,
+        24,
+        37,
+        3
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c1s02_raw",
@@ -30,10 +36,10 @@
       "n_hypo": 8,
       "n_normal": 2880,
       "prevalence_pct": 0.2770083102493075,
-      "glucose_mean": 155.57689208984374,
-      "glucose_std": 44.585530853271486,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 155.57686980609418,
+      "glucose_std": 44.587797135088216,
+      "glucose_min": 61.0,
+      "glucose_max": 380.0,
       "stratified_val_hypo_per_fold": [
         2,
         2,
@@ -41,8 +47,14 @@
         1,
         1
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        4,
+        0,
+        0,
+        4,
+        0
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c1s03_raw",
@@ -52,19 +64,25 @@
       "n_hypo": 83,
       "n_normal": 2627,
       "prevalence_pct": 3.062730627306273,
-      "glucose_mean": 145.33432006835938,
-      "glucose_std": 55.98779373168945,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 145.33431734317344,
+      "glucose_std": 55.993209618907976,
+      "glucose_min": 40.0,
+      "glucose_max": 339.0,
       "stratified_val_hypo_per_fold": [
-        17,
-        17,
-        17,
         16,
-        16
+        16,
+        17,
+        17,
+        17
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        22,
+        30,
+        6,
+        19,
+        6
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c1s04_raw",
@@ -74,19 +92,25 @@
       "n_hypo": 6,
       "n_normal": 2318,
       "prevalence_pct": 0.25817555938037867,
-      "glucose_mean": 152.81549072265625,
-      "glucose_std": 48.74351577758789,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 152.81540447504304,
+      "glucose_std": 48.74828126419778,
+      "glucose_min": 61.0,
+      "glucose_max": 388.0,
       "stratified_val_hypo_per_fold": [
+        1,
+        1,
+        1,
         2,
-        1,
-        1,
-        1,
         1
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        0,
+        6,
+        0,
+        0,
+        0
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c1s05_raw",
@@ -96,19 +120,25 @@
       "n_hypo": 112,
       "n_normal": 2738,
       "prevalence_pct": 3.9298245614035086,
-      "glucose_mean": 108.93508758544922,
-      "glucose_std": 27.159203338623048,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 108.93508771929825,
+      "glucose_std": 27.162751786986313,
+      "glucose_min": 52.0,
+      "glucose_max": 231.0,
       "stratified_val_hypo_per_fold": [
-        23,
-        23,
         22,
         22,
-        22
+        22,
+        23,
+        23
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        48,
+        17,
+        0,
+        0,
+        47
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c2s01_raw",
@@ -118,19 +148,25 @@
       "n_hypo": 129,
       "n_normal": 2729,
       "prevalence_pct": 4.513645906228132,
-      "glucose_mean": 124.46465759277343,
-      "glucose_std": 44.83608169555664,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 124.46466060181946,
+      "glucose_std": 44.84048756374966,
+      "glucose_min": 40.0,
+      "glucose_max": 330.0,
       "stratified_val_hypo_per_fold": [
         26,
         26,
         26,
-        26,
+        25,
+        26
+      ],
+      "blocked_val_hypo_per_fold": [
+        19,
+        4,
+        19,
+        62,
         25
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "source": "segments.pkl"
     },
     {
       "subject": "c2s02_raw",
@@ -140,10 +176,10 @@
       "n_hypo": 155,
       "n_normal": 2333,
       "prevalence_pct": 6.229903536977492,
-      "glucose_mean": 109.0217300415039,
-      "glucose_std": 30.927525329589844,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 109.0217041800643,
+      "glucose_std": 30.930029607178117,
+      "glucose_min": 40.0,
+      "glucose_max": 228.0,
       "stratified_val_hypo_per_fold": [
         31,
         31,
@@ -151,8 +187,14 @@
         31,
         31
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        2,
+        31,
+        37,
+        2,
+        83
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c2s03_raw",
@@ -162,19 +204,25 @@
       "n_hypo": 48,
       "n_normal": 2192,
       "prevalence_pct": 2.142857142857143,
-      "glucose_mean": 135.78571166992188,
-      "glucose_std": 38.613633728027345,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 135.78571428571428,
+      "glucose_std": 38.6145625221303,
+      "glucose_min": 40.0,
+      "glucose_max": 266.0,
       "stratified_val_hypo_per_fold": [
-        10,
-        10,
-        10,
         9,
-        9
+        9,
+        10,
+        10,
+        10
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        10,
+        31,
+        0,
+        4,
+        3
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c2s04_raw",
@@ -184,10 +232,10 @@
       "n_hypo": 90,
       "n_normal": 3158,
       "prevalence_pct": 2.770935960591133,
-      "glucose_mean": 135.76600646972656,
-      "glucose_std": 42.83443374633789,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 135.76600985221674,
+      "glucose_std": 42.83715932521775,
+      "glucose_min": 40.0,
+      "glucose_max": 295.0,
       "stratified_val_hypo_per_fold": [
         18,
         18,
@@ -195,8 +243,14 @@
         18,
         18
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        1,
+        45,
+        8,
+        25,
+        11
+      ],
+      "source": "segments.pkl"
     },
     {
       "subject": "c2s05_raw",
@@ -206,10 +260,10 @@
       "n_hypo": 190,
       "n_normal": 2958,
       "prevalence_pct": 6.035578144853876,
-      "glucose_mean": 109.7471420288086,
-      "glucose_std": 35.541439819335935,
-      "glucose_min": null,
-      "glucose_max": null,
+      "glucose_mean": 109.74714104193139,
+      "glucose_std": 35.54524795142117,
+      "glucose_min": 40.0,
+      "glucose_max": 317.0,
       "stratified_val_hypo_per_fold": [
         38,
         38,
@@ -217,8 +271,14 @@
         38,
         38
       ],
-      "blocked_val_hypo_per_fold": [],
-      "source": "reference_metadata"
+      "blocked_val_hypo_per_fold": [
+        31,
+        54,
+        41,
+        9,
+        55
+      ],
+      "source": "segments.pkl"
     }
   ],
   "totals": {
@@ -226,7 +286,7 @@
     "n_hypo": 951,
     "n_normal": 25830,
     "prevalence_pct": 3.5510249803965497,
-    "glucose_mean_avg": 129.1014500427246,
-    "glucose_std_avg": 40.6048828125
+    "glucose_mean_avg": 129.10142502032335,
+    "glucose_std_avg": 40.6086965803417
   }
 }
